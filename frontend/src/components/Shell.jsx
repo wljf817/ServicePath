@@ -1,6 +1,6 @@
 import {Button} from "@heroui/react";
 
-import {ActivityIcon, HistoryIcon, SettingsIcon} from "./Icons";
+import {ActivityIcon, HistoryIcon, LogoMark, SettingsIcon} from "./Icons";
 
 export default function Shell({children, path, navigate}) {
     const links = [
@@ -20,10 +20,9 @@ export default function Shell({children, path, navigate}) {
                 <div className="topbar-inner">
                     <button className="brand" onClick={() => navigate("/")} type="button">
                         <span className="brand-mark">
-                            <ActivityIcon size={20} />
-                            <i className="brand-signal" />
+                            <LogoMark size={22} />
                         </span>
-                        <span>
+                        <span className="brand-copy">
                             <strong>ServicePath</strong>
                             <small>Diagnostic workspace</small>
                         </span>
@@ -56,11 +55,18 @@ export default function Shell({children, path, navigate}) {
             <main className="app-content" id="main-content" tabIndex="-1">{children}</main>
 
             <footer className="app-footer">
-                <div>
-                    <strong>ServicePath</strong>
-                    <span>Follow the request. Find the break.</span>
+                <div className="footer-identity">
+                    <span className="footer-mark"><LogoMark size={18} /></span>
+                    <span className="footer-copy">
+                        <strong>ServicePath</strong>
+                        <small>Follow the request. Find the break.</small>
+                    </span>
                 </div>
-                <span>Flask · React · HeroUI</span>
+                <div className="footer-meta" aria-label="Application details">
+                    <span>Five-layer diagnostics</span>
+                    <i aria-hidden="true" />
+                    <span>Flask + React</span>
+                </div>
             </footer>
         </div>
     );

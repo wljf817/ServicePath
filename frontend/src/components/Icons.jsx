@@ -73,6 +73,28 @@ export function HistoryIcon(props) {
     );
 }
 
+export function LogoMark({size = 22}) {
+    return (
+        <svg
+            aria-hidden="true"
+            fill="none"
+            height={size}
+            viewBox="0 0 24 24"
+            width={size}
+        >
+            <path
+                d="M4 6h5a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3h5"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="1.8"
+            />
+            <circle cx="4" cy="6" fill="currentColor" r="2" />
+            <circle cx="12" cy="12" fill="currentColor" r="1.7" />
+            <circle cx="20" cy="18" fill="currentColor" r="2" />
+        </svg>
+    );
+}
+
 export function SettingsIcon(props) {
     return (
         <Icon {...props}>
