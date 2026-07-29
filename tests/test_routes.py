@@ -1,6 +1,6 @@
+import os
 import tempfile
 import unittest
-import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,6 +10,13 @@ from diagnostics.result import make_result
 
 
 def sample_report():
+    layer_names = {
+        "client": "Client Network",
+        "dns": "DNS",
+        "tcp": "TCP",
+        "tls": "TLS",
+        "http": "HTTP",
+    }
     return {
         "target": {"url": "https://example.com/"},
         "mode": "local",
@@ -18,7 +25,8 @@ def sample_report():
         "status": "passed",
         "first_problem": None,
         "layers": [
-            make_result("dns", "DNS", "passed", "DNS passed", 10, {"A records": ["93.184.216.34"]})
+            make_result(key, name, "passed", f"{name} passed", 10)
+            for key, name in layer_names.items()
         ],
     }
 
@@ -110,6 +118,40 @@ class RouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Remote Test", response.data)
+        run_remote.assert_called_once_with("example.com")
+
+    @patch("app.analyze_report")
+    @patch("app.run_remote_diagnostics")
+    @patch("app.run_diagnostics")
+    def test_compare_both_displays_side_by_side_report(
+        self,
+        run_diagnostics,
+        run_remote,
+        analyze_report,
+    ):
+        local_report = sample_report()
+        remote_report = sample_report()
+        remote_report["mode"] = "remote"
+        run_diagnostics.return_value = local_report
+        run_remote.return_value = remote_report
+        analyze_report.return_value = {
+            "source": "rules",
+            "title": "No problem detected from either location",
+            "explanation": "Both tests passed.",
+            "causes": [],
+            "actions": [],
+        }
+
+        response = self.client.post(
+            "/diagnose",
+            data={"domain": "example.com", "mode": "compare"},
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Layer comparison", response.data)
+        self.assertIn(b"No problem detected from either location", response.data)
+        run_diagnostics.assert_called_once_with("example.com", mode="local")
         run_remote.assert_called_once_with("example.com")
 
     @patch("app.run_diagnostics")

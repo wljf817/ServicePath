@@ -57,7 +57,7 @@
                                 type="radio"
                                 name="mode"
                                 value="local"
-                                {% if mode != 'remote' %}checked{% endif %}
+                                {% if mode not in ['remote', 'compare'] %}checked{% endif %}
                             >
                             <span>
                                 <strong>Local Test</strong>
@@ -75,6 +75,19 @@
                             <span>
                                 <strong>Remote Test</strong>
                                 <small>Deployed ServicePath server</small>
+                            </span>
+                        </label>
+
+                        <label class="mode-card">
+                            <input
+                                type="radio"
+                                name="mode"
+                                value="compare"
+                                {% if mode == 'compare' %}checked{% endif %}
+                            >
+                            <span>
+                                <strong>Compare Both</strong>
+                                <small>Local and remote side by side</small>
                             </span>
                         </label>
                     </div>
@@ -164,45 +177,7 @@
             </div>
         </section>
 
-        <section class="ai-card">
-            <div class="ai-icon">AI</div>
-            <div class="analysis-content">
-                <p class="eyebrow">AI ANALYSIS</p>
-                {% if report and report.analysis %}
-                    {% if report.analysis.source == 'openai' %}
-                        <h2>AI explanation and recommended actions</h2>
-                        <p class="analysis-source">Generated with {{ report.analysis.model }}</p>
-                        <div class="analysis-text">{{ report.analysis.text }}</div>
-                    {% else %}
-                        <h2>{{ report.analysis.title }}</h2>
-                        <p>{{ report.analysis.explanation }}</p>
-
-                        {% if report.analysis.causes %}
-                            <h3>Possible causes</h3>
-                            <ul>
-                                {% for cause in report.analysis.causes %}
-                                    <li>{{ cause }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% endif %}
-
-                        <h3>Recommended actions</h3>
-                        <ol>
-                            {% for action in report.analysis.actions %}
-                                <li>{{ action }}</li>
-                            {% endfor %}
-                        </ol>
-
-                        {% if report.analysis.note %}
-                            <p class="analysis-note">{{ report.analysis.note }}</p>
-                        {% endif %}
-                    {% endif %}
-                {% else %}
-                    <h2>Explanation and recommended actions</h2>
-                    <p>AI guidance will appear here after all diagnostic layers finish.</p>
-                {% endif %}
-            </div>
-        </section>
+        {% include '_analysis.html' %}
     </main>
 
     <footer>

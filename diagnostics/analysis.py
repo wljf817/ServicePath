@@ -82,7 +82,79 @@ GUIDANCE = {
 }
 
 
+def comparison_analysis(report):
+    comparison = report["comparison"]
+    classification = comparison["classification"]
+    local_problem = comparison.get("local_problem")
+    remote_problem = comparison.get("remote_problem")
+
+    if classification == "no_issue":
+        return {
+            "source": "rules",
+            "title": comparison["title"],
+            "explanation": comparison["summary"],
+            "causes": [],
+            "actions": [
+                "No repair is required based on these two tests.",
+                "Repeat Compare Both if the problem returns intermittently.",
+            ],
+        }
+
+    if classification == "local_only":
+        guidance = GUIDANCE.get(local_problem, GUIDANCE["client"])
+        actions = list(guidance["actions"])
+        actions.append("Compare local DNS, proxy, VPN, and firewall settings.")
+        return {
+            "source": "rules",
+            "title": comparison["title"],
+            "explanation": comparison["summary"],
+            "causes": list(guidance["causes"]),
+            "actions": actions,
+        }
+
+    if classification == "remote_only":
+        guidance = GUIDANCE.get(remote_problem, GUIDANCE["client"])
+        return {
+            "source": "rules",
+            "title": comparison["title"],
+            "explanation": comparison["summary"],
+            "causes": [
+                "The remote server has a regional routing or DNS difference",
+                "The target blocks the remote server's IP or region",
+            ],
+            "actions": list(guidance["actions"]),
+        }
+
+    if classification == "shared_problem":
+        guidance = GUIDANCE.get(local_problem, GUIDANCE["http"])
+        return {
+            "source": "rules",
+            "title": comparison["title"],
+            "explanation": comparison["summary"],
+            "causes": list(guidance["causes"]),
+            "actions": list(guidance["actions"]),
+        }
+
+    return {
+        "source": "rules",
+        "title": comparison["title"],
+        "explanation": comparison["summary"],
+        "causes": [
+            "The two networks use different DNS, routes, or address families",
+            "The website applies different rules by IP address or region",
+        ],
+        "actions": [
+            "Review each test's first problem layer separately.",
+            "Compare DNS answers, proxies, and firewall rules between locations.",
+            "Repeat both tests to rule out an intermittent failure.",
+        ],
+    }
+
+
 def rule_based_analysis(report):
+    if report.get("mode") == "compare":
+        return comparison_analysis(report)
+
     problem = report.get("first_problem")
 
     if not problem:

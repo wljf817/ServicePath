@@ -27,6 +27,23 @@ class AnalysisTests(unittest.TestCase):
 
         self.assertEqual(analysis["title"], "No failure was detected")
 
+    def test_explains_local_only_comparison(self):
+        comparison_report = {
+            "mode": "compare",
+            "comparison": {
+                "classification": "local_only",
+                "title": "The problem is likely local",
+                "summary": "Local DNS failed and Remote Test passed.",
+                "local_problem": "dns",
+                "remote_problem": None,
+            },
+        }
+
+        analysis = rule_based_analysis(comparison_report)
+
+        self.assertIn("local", analysis["title"].lower())
+        self.assertTrue(analysis["actions"])
+
     @patch.dict(os.environ, {}, clear=True)
     def test_uses_rules_without_api_key(self):
         analysis = analyze_report(report("http"))

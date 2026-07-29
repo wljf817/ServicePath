@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 from database import get_report, init_db, list_reports, save_report
 from diagnostics.analysis import analyze_report
+from diagnostics.compare import compare_reports
 from diagnostics.remote import RemoteError, run_remote_diagnostics
 from diagnostics.runner import run_diagnostics
 from diagnostics.target import TargetError
@@ -46,8 +47,9 @@ def view_report(report_id):
     report = get_report(app.config["DATABASE"], report_id)
     if not report:
         abort(404)
+    template = "compare.html" if report["mode"] == "compare" else "index.html"
     return render_template(
-        "index.html",
+        template,
         report=report,
         domain=report["target"]["url"],
         mode=report["mode"],
@@ -59,11 +61,15 @@ def diagnose():
     domain = request.form.get("domain", "").strip()
     mode = request.form.get("mode", "local")
 
-    if mode not in {"local", "remote"}:
+    if mode not in {"local", "remote", "compare"}:
         return render_template("index.html", error="Invalid test mode.", domain=domain), 400
 
     try:
-        if mode == "remote":
+        if mode == "compare":
+            local_report = run_diagnostics(domain, mode="local")
+            remote_report = run_remote_diagnostics(domain)
+            report = compare_reports(local_report, remote_report)
+        elif mode == "remote":
             report = run_remote_diagnostics(domain)
         else:
             report = run_diagnostics(domain, mode="local")

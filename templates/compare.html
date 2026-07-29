@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Both · ServicePath</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{{ url_for('index') }}">
+            <span class="brand-mark">SP</span>
+            <span>ServicePath</span>
+        </a>
+        <nav>
+            <a href="{{ url_for('index') }}">New test</a>
+            <a href="{{ url_for('history') }}">History</a>
+        </nav>
+    </header>
+
+    <main class="page compare-page">
+        <section class="compare-summary status-border-{{ report.status }}">
+            <div>
+                <p class="eyebrow">COMPARE BOTH · {{ report.target.url }}</p>
+                <h1>{{ report.comparison.title }}</h1>
+                <p class="intro-text">{{ report.comparison.summary }}</p>
+            </div>
+            <span class="comparison-status status-{{ report.status }}">
+                {{ report.status|title }}
+            </span>
+        </section>
+
+        <section class="compare-consoles">
+            {% for label, test_report in [('Local Test', report.local_report), ('Remote Test', report.remote_report)] %}
+                <div class="console-card">
+                    <div class="card-heading">
+                        <div>
+                            <p class="eyebrow">{{ label|upper }}</p>
+                            <h2>Diagnostic Console</h2>
+                        </div>
+                        <span class="console-dot"></span>
+                    </div>
+                    <div class="console compare-console">
+                        {% for layer in test_report.layers %}
+                            <p>
+                                <span class="{{ layer.status }}">[{{ layer.status|upper }}]</span>
+                                {{ layer.name }} — {{ layer.summary }}
+                            </p>
+                        {% endfor %}
+                        <p>
+                            <span class="info">[DONE]</span>
+                            {{ test_report.duration_ms }} ms · {{ test_report.status|upper }}
+                        </p>
+                    </div>
+                </div>
+            {% endfor %}
+        </section>
+
+        <section class="comparison-card">
+            <div class="card-heading">
+                <div>
+                    <p class="eyebrow">SIDE-BY-SIDE</p>
+                    <h2>Layer comparison</h2>
+                </div>
+            </div>
+
+            <div class="comparison-table">
+                <div class="comparison-heading">
+                    <strong>Layer</strong>
+                    <strong>Local Test</strong>
+                    <strong>Remote Test</strong>
+                </div>
+                {% for row in report.comparison.layers %}
+                    <div class="comparison-row">
+                        <strong>{{ row.name }}</strong>
+                        <div>
+                            <em class="status-{{ row.local.status }}">{{ row.local.status|title }}</em>
+                            <p>{{ row.local.summary }}</p>
+                        </div>
+                        <div>
+                            <em class="status-{{ row.remote.status }}">{{ row.remote.status|title }}</em>
+                            <p>{{ row.remote.summary }}</p>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        {% include '_analysis.html' %}
+    </main>
+
+    <footer>ServicePath &middot; Built with Flask</footer>
+</body>
+</html>

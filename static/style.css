@@ -171,7 +171,7 @@ fieldset {
 
 .mode-options {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin-top: 9px;
 }
@@ -451,6 +451,117 @@ footer {
     box-shadow: 0 8px 24px rgba(33, 54, 71, 0.05);
 }
 
+.compare-page {
+    width: min(1180px, 92%);
+}
+
+.compare-summary,
+.comparison-card {
+    background: #ffffff;
+    border: 1px solid #dce3e8;
+    border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(33, 54, 71, 0.06);
+}
+
+.compare-summary {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 22px;
+    padding: 28px;
+    border-left: 5px solid #0b7a75;
+}
+
+.compare-summary h1 {
+    margin-bottom: 10px;
+    font-size: clamp(28px, 5vw, 44px);
+}
+
+.status-border-warning {
+    border-left-color: #d49a00;
+}
+
+.status-border-error {
+    border-left-color: #bd2c3b;
+}
+
+.comparison-status,
+.comparison-row em {
+    padding: 6px 10px;
+    border-radius: 14px;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: bold;
+}
+
+.comparison-status.status-passed,
+.comparison-row .status-passed {
+    background: #e7f7ef;
+    color: #167a52;
+}
+
+.comparison-status.status-warning,
+.comparison-row .status-warning {
+    background: #fff5d9;
+    color: #8a6400;
+}
+
+.comparison-status.status-error,
+.comparison-row .status-error {
+    background: #fdebed;
+    color: #b32838;
+}
+
+.comparison-row .status-skipped {
+    background: #edf1f3;
+    color: #71808a;
+}
+
+.compare-consoles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    margin-bottom: 22px;
+}
+
+.compare-console {
+    min-height: 250px;
+}
+
+.comparison-card {
+    overflow: hidden;
+}
+
+.comparison-table {
+    padding: 0 22px 12px;
+}
+
+.comparison-heading,
+.comparison-row {
+    display: grid;
+    grid-template-columns: 150px 1fr 1fr;
+    gap: 18px;
+    padding: 16px 0;
+}
+
+.comparison-heading {
+    color: #71808a;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.comparison-row {
+    border-top: 1px solid #e8edf0;
+}
+
+.comparison-row p {
+    margin: 10px 0 0;
+    color: #687680;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
 .history-item {
     display: flex;
     align-items: center;
@@ -519,7 +630,8 @@ footer {
     }
 
     .search-row,
-    .workspace {
+    .workspace,
+    .compare-consoles {
         display: grid;
         grid-template-columns: 1fr;
     }
@@ -530,5 +642,18 @@ footer {
 
     button {
         width: 100%;
+    }
+
+    .compare-summary {
+        display: grid;
+    }
+
+    .comparison-heading {
+        display: none;
+    }
+
+    .comparison-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
     }
 }
