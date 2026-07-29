@@ -37,7 +37,16 @@ class NormalizeTargetTests(unittest.TestCase):
             validate_public_addresses(["93.184.216.34", "192.168.1.10"])
 
     def test_accepts_public_dns_results(self):
-        validate_public_addresses(["93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"])
+        validate_public_addresses(
+            ["93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"]
+        )
+
+    def test_rejects_proxy_fake_ip_by_default(self):
+        with self.assertRaises(TargetError):
+            validate_public_addresses(["198.18.0.10"])
+
+    def test_allows_proxy_fake_ip_when_requested(self):
+        validate_public_addresses(["198.18.0.10"], allow_proxy_fake_ip=True)
 
 
 if __name__ == "__main__":

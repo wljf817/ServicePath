@@ -26,7 +26,11 @@ def check_client_network():
         socket.AF_INET6,
         ("2606:4700:4700::1111", 53, 0, 0),
     )
-    proxies = getproxies()
+    proxies = {
+        name: value
+        for name, value in getproxies().items()
+        if name.lower() in {"http", "https", "all", "socks"} and value
+    }
 
     details = {
         "IPv4 route": ipv4 or "Unavailable",
@@ -48,4 +52,13 @@ def check_client_network():
         summary = "IPv4 and IPv6 routes are available."
 
     duration = round((perf_counter() - started) * 1000)
-    return make_result("client", "Client Network", status, summary, duration, details)
+    result = make_result(
+        "client",
+        "Client Network",
+        status,
+        summary,
+        duration,
+        details,
+    )
+    result["proxy_detected"] = bool(proxies)
+    return result

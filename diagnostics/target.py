@@ -2,6 +2,9 @@ import ipaddress
 from urllib.parse import urlsplit, urlunsplit
 
 
+PROXY_FAKE_IP_NETWORK = ipaddress.ip_network("198.18.0.0/15")
+
+
 class TargetError(ValueError):
     """Raised when a target is invalid or unsafe to request."""
 
@@ -78,7 +81,16 @@ def validate_hostname(hostname):
         raise TargetError("Private, loopback, and reserved IP addresses are not allowed.")
 
 
-def validate_public_addresses(addresses):
+def is_proxy_fake_address(value):
+    """Return whether an address is in the standard proxy Fake-IP range."""
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return address in PROXY_FAKE_IP_NETWORK
+
+
+def validate_public_addresses(addresses, allow_proxy_fake_ip=False):
     """Reject DNS results that point to a non-public network."""
     if not addresses:
         raise TargetError("The domain did not return an IP address.")
@@ -89,5 +101,6 @@ def validate_public_addresses(addresses):
         except ValueError as error:
             raise TargetError("The domain returned an invalid IP address.") from error
 
-        if not address.is_global:
+        proxy_fake_ip = allow_proxy_fake_ip and is_proxy_fake_address(value)
+        if not address.is_global and not proxy_fake_ip:
             raise TargetError("The domain resolves to a private or reserved IP address.")
