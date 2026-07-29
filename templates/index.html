@@ -31,6 +31,20 @@
         </section>
 
         <section class="search-card">
+            {% if app_settings and app_settings.instance_role == 'remote_server' %}
+                <p class="role-banner">
+                    <strong>Deployed Remote Server:</strong>
+                    Remote Test runs on this server. Start ServicePath on the user's
+                    computer to enable Local Test and Compare Both.
+                </p>
+            {% elif app_settings %}
+                <p class="role-banner local-role">
+                    <strong>Local Device:</strong>
+                    Local Test runs on this computer. Remote Test uses the deployed URL
+                    configured in Settings.
+                </p>
+            {% endif %}
+
             <form id="diagnostic-form" action="{{ url_for('diagnose') }}" method="post">
                 <label for="domain">Website or domain</label>
                 <div class="search-row">
@@ -53,12 +67,13 @@
                 <fieldset>
                     <legend>Run test from</legend>
                     <div class="mode-options">
-                        <label class="mode-card">
+                        <label class="mode-card {% if app_settings and app_settings.instance_role == 'remote_server' %}disabled-card{% endif %}">
                             <input
                                 type="radio"
                                 name="mode"
                                 value="local"
                                 {% if mode not in ['remote', 'compare'] %}checked{% endif %}
+                                {% if app_settings and app_settings.instance_role == 'remote_server' %}disabled{% endif %}
                             >
                             <span>
                                 <strong>Local Test</strong>
@@ -79,12 +94,13 @@
                             </span>
                         </label>
 
-                        <label class="mode-card">
+                        <label class="mode-card {% if app_settings and app_settings.instance_role == 'remote_server' %}disabled-card{% endif %}">
                             <input
                                 type="radio"
                                 name="mode"
                                 value="compare"
                                 {% if mode == 'compare' %}checked{% endif %}
+                                {% if app_settings and app_settings.instance_role == 'remote_server' %}disabled{% endif %}
                             >
                             <span>
                                 <strong>Compare Both</strong>

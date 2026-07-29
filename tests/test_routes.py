@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app import app
-from database import get_settings, init_db
+from database import get_settings, init_db, update_settings
 from diagnostics.result import make_result
 
 
@@ -37,6 +37,10 @@ class RouteTests(unittest.TestCase):
         app.config["TESTING"] = True
         app.config["DATABASE"] = str(Path(self.temporary_directory.name) / "test.db")
         init_db(app.config["DATABASE"])
+        update_settings(
+            app.config["DATABASE"],
+            {"instance_role": "local_device", "remote_service_url": ""},
+        )
         self.client = app.test_client()
 
     def tearDown(self):
@@ -82,10 +86,24 @@ class RouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    @patch("app.run_diagnostics")
+    @patch.dict(os.environ, {}, clear=True)
+    def test_public_host_requires_settings_password(self):
+        response = self.client.post(
+            "/settings",
+            data={
+                "instance_role": "remote_server",
+                "remote_service_url": "",
+            },
+            headers={"Host": "servicepath.example"},
+            environ_base={"REMOTE_ADDR": "127.0.0.1"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    @patch("app.run_selected_diagnostics")
     @patch("app.analyze_report")
-    def test_local_diagnosis_displays_report(self, analyze_report, run_diagnostics):
-        run_diagnostics.return_value = sample_report()
+    def test_local_diagnosis_displays_report(self, analyze_report, run_selected):
+        run_selected.return_value = sample_report()
         analyze_report.return_value = {
             "source": "rules",
             "title": "No failure was detected",
@@ -103,12 +121,16 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"DNS passed", response.data)
         self.assertIn(b"No failure was detected", response.data)
-        run_diagnostics.assert_called_once_with("example.com", mode="local")
+        run_selected.assert_called_once_with(
+            "example.com",
+            "local",
+            {"instance_role": "local_device", "remote_service_url": ""},
+        )
 
-    @patch("app.run_diagnostics")
+    @patch("app.run_selected_diagnostics")
     @patch("app.analyze_report")
-    def test_saved_report_appears_in_history(self, analyze_report, run_diagnostics):
-        run_diagnostics.return_value = sample_report()
+    def test_saved_report_appears_in_history(self, analyze_report, run_selected):
+        run_selected.return_value = sample_report()
         analyze_report.return_value = {"source": "rules", "title": "Test", "actions": []}
         self.client.post(
             "/diagnose",
@@ -131,11 +153,11 @@ class RouteTests(unittest.TestCase):
         self.assertIn(b"REMOTE_SERVICE_URL", response.data)
 
     @patch("app.analyze_report")
-    @patch("app.run_remote_diagnostics")
-    def test_remote_diagnosis_displays_report(self, run_remote, analyze_report):
+    @patch("app.run_selected_diagnostics")
+    def test_remote_diagnosis_displays_report(self, run_selected, analyze_report):
         remote_report = sample_report()
         remote_report["mode"] = "remote"
-        run_remote.return_value = remote_report
+        run_selected.return_value = remote_report
         analyze_report.return_value = {
             "source": "rules",
             "title": "No failure was detected",
@@ -152,22 +174,25 @@ class RouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Remote Test", response.data)
-        run_remote.assert_called_once_with("example.com")
+        run_selected.assert_called_once_with(
+            "example.com",
+            "remote",
+            {"instance_role": "local_device", "remote_service_url": ""},
+        )
 
     @patch("app.analyze_report")
-    @patch("app.run_remote_diagnostics")
-    @patch("app.run_diagnostics")
+    @patch("app.run_selected_diagnostics")
     def test_compare_both_displays_side_by_side_report(
         self,
-        run_diagnostics,
-        run_remote,
+        run_selected,
         analyze_report,
     ):
+        from diagnostics.compare import compare_reports
+
         local_report = sample_report()
         remote_report = sample_report()
         remote_report["mode"] = "remote"
-        run_diagnostics.return_value = local_report
-        run_remote.return_value = remote_report
+        run_selected.return_value = compare_reports(local_report, remote_report)
         analyze_report.return_value = {
             "source": "rules",
             "title": "No problem detected from either location",
@@ -185,8 +210,41 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Layer comparison", response.data)
         self.assertIn(b"No problem detected from either location", response.data)
-        run_diagnostics.assert_called_once_with("example.com", mode="local")
-        run_remote.assert_called_once_with("example.com")
+        run_selected.assert_called_once_with(
+            "example.com",
+            "compare",
+            {"instance_role": "local_device", "remote_service_url": ""},
+        )
+
+    @patch("app.run_selected_diagnostics")
+    @patch("app.analyze_report")
+    def test_remote_server_runs_remote_mode(self, analyze_report, run_selected):
+        update_settings(
+            app.config["DATABASE"],
+            {"instance_role": "remote_server", "remote_service_url": ""},
+        )
+        remote_report = sample_report()
+        remote_report["mode"] = "remote"
+        run_selected.return_value = remote_report
+        analyze_report.return_value = {
+            "source": "rules",
+            "title": "Test",
+            "explanation": "Test",
+            "causes": [],
+            "actions": [],
+        }
+
+        response = self.client.post(
+            "/diagnose",
+            data={"domain": "example.com", "mode": "remote"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        run_selected.assert_called_once_with(
+            "example.com",
+            "remote",
+            {"instance_role": "remote_server", "remote_service_url": ""},
+        )
 
     @patch("app.run_diagnostics")
     def test_api_returns_remote_report(self, run_diagnostics):

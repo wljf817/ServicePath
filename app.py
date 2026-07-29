@@ -14,8 +14,8 @@ from database import (
     update_settings,
 )
 from diagnostics.analysis import analyze_report
-from diagnostics.compare import compare_reports
-from diagnostics.remote import RemoteError, run_remote_diagnostics
+from diagnostics.execution import ExecutionError, run_selected_diagnostics
+from diagnostics.remote import RemoteError
 from diagnostics.runner import run_diagnostics
 from diagnostics.target import TargetError
 
@@ -41,7 +41,15 @@ def format_detail(value):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    current_settings = get_settings(app.config["DATABASE"])
+    default_mode = (
+        "remote" if current_settings["instance_role"] == "remote_server" else "local"
+    )
+    return render_template(
+        "index.html",
+        mode=default_mode,
+        app_settings=current_settings,
+    )
 
 
 @app.route("/history")
@@ -58,7 +66,9 @@ def settings_page():
     if request.method == "POST":
         expected_password = os.getenv("SETTINGS_PASSWORD", "")
         supplied_password = request.form.get("settings_password", "")
-        is_local_request = request.remote_addr in {"127.0.0.1", "::1"}
+        is_loopback_address = request.remote_addr in {"127.0.0.1", "::1"}
+        is_local_host = request.host.startswith(("127.0.0.1", "localhost", "[::1]"))
+        is_local_request = is_loopback_address and is_local_host
 
         if expected_password:
             authorized = hmac.compare_digest(supplied_password, expected_password)
@@ -66,7 +76,7 @@ def settings_page():
             authorized = is_local_request
 
         if not authorized:
-            error = "The settings password is incorrect."
+            error = "A valid settings password is required."
         else:
             try:
                 values = validate_settings(
@@ -92,7 +102,7 @@ def settings_page():
             api_token_configured=bool(os.getenv("SERVICEPATH_API_TOKEN")),
             ai_configured=bool(os.getenv("OPENAI_API_KEY")),
         ),
-        403 if error == "The settings password is incorrect." else 200,
+        403 if error == "A valid settings password is required." else 200,
     )
 
 
@@ -107,6 +117,7 @@ def view_report(report_id):
         report=report,
         domain=report["target"]["url"],
         mode=report["mode"],
+        app_settings=get_settings(app.config["DATABASE"]),
     )
 
 
@@ -119,22 +130,22 @@ def diagnose():
         return render_template("index.html", error="Invalid test mode.", domain=domain), 400
 
     try:
-        if mode == "compare":
-            local_report = run_diagnostics(domain, mode="local")
-            remote_report = run_remote_diagnostics(domain)
-            report = compare_reports(local_report, remote_report)
-        elif mode == "remote":
-            report = run_remote_diagnostics(domain)
+        current_settings = get_settings(app.config["DATABASE"])
+        report = run_selected_diagnostics(domain, mode, current_settings)
+    except (ExecutionError, TargetError, RemoteError) as error:
+        if isinstance(error, RemoteError):
+            status_code = 503
+        elif isinstance(error, ExecutionError):
+            status_code = 409
         else:
-            report = run_diagnostics(domain, mode="local")
-    except (TargetError, RemoteError) as error:
-        status_code = 503 if isinstance(error, RemoteError) else 400
+            status_code = 400
         return (
             render_template(
                 "index.html",
                 error=str(error),
                 domain=domain,
                 mode=mode,
+                app_settings=get_settings(app.config["DATABASE"]),
             ),
             status_code,
         )

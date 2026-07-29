@@ -8,8 +8,10 @@ class RemoteError(RuntimeError):
     """Raised when the configured remote diagnostic service cannot be used."""
 
 
-def _remote_endpoint():
-    service_url = os.getenv("REMOTE_SERVICE_URL", "").strip()
+def _remote_endpoint(service_url=None):
+    if service_url is None:
+        service_url = os.getenv("REMOTE_SERVICE_URL", "")
+    service_url = service_url.strip()
 
     if not service_url:
         raise RemoteError("Remote Test requires REMOTE_SERVICE_URL in your .env file.")
@@ -37,8 +39,8 @@ def _validate_report(report):
             raise RemoteError("The remote report contains an invalid layer result.")
 
 
-def run_remote_diagnostics(target, timeout=45):
-    endpoint = _remote_endpoint()
+def run_remote_diagnostics(target, timeout=45, service_url=None):
+    endpoint = _remote_endpoint(service_url)
     token = os.getenv("SERVICEPATH_API_TOKEN", "").strip()
     headers = {}
 

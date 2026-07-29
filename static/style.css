@@ -115,6 +115,23 @@ h2 {
     margin-bottom: 22px;
 }
 
+.role-banner {
+    margin: 0 0 20px;
+    padding: 12px 14px;
+    border-left: 4px solid #3d7ea6;
+    border-radius: 7px;
+    background: #edf6fb;
+    color: #365769;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.role-banner.local-role {
+    border-left-color: #0b7a75;
+    background: #f0faf9;
+    color: #315f5c;
+}
+
 label,
 legend {
     font-size: 14px;
@@ -200,6 +217,11 @@ fieldset {
     border: 1px solid #dce3e8;
     border-radius: 8px;
     cursor: pointer;
+}
+
+.mode-card.disabled-card {
+    cursor: not-allowed;
+    opacity: 0.55;
 }
 
 .mode-card input {

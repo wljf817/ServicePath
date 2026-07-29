@@ -54,6 +54,23 @@ class RemoteDiagnosticTests(unittest.TestCase):
         )
 
     @patch("diagnostics.remote.requests.post")
+    @patch.dict(os.environ, {}, clear=True)
+    def test_accepts_service_url_argument(self, post):
+        response = Mock()
+        response.json.return_value = remote_report()
+        post.return_value = response
+
+        run_remote_diagnostics(
+            "example.com",
+            service_url="https://configured.example",
+        )
+
+        self.assertEqual(
+            post.call_args.args[0],
+            "https://configured.example/api/diagnose",
+        )
+
+    @patch("diagnostics.remote.requests.post")
     @patch.dict(
         os.environ,
         {"REMOTE_SERVICE_URL": "https://servicepath.example"},
