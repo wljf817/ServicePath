@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ServicePath</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{{ url_for('index') }}">
+            <span class="brand-mark">SP</span>
+            <span>ServicePath</span>
+        </a>
+        <span class="header-label">Website diagnostics</span>
+    </header>
+
+    <main class="page">
+        <section class="intro">
+            <p class="eyebrow">FIVE-LAYER DIAGNOSTICS</p>
+            <h1>Find where a website connection breaks.</h1>
+            <p class="intro-text">
+                Check the client network, DNS, TCP, TLS, and HTTP layers,
+                then turn the results into clear next steps.
+            </p>
+        </section>
+
+        <section class="search-card">
+            <form action="{{ url_for('diagnose') }}" method="post">
+                <label for="domain">Website or domain</label>
+                <div class="search-row">
+                    <input
+                        id="domain"
+                        name="domain"
+                        type="text"
+                        placeholder="example.com"
+                        value="{{ domain or '' }}"
+                        autocomplete="off"
+                        required
+                    >
+                    <button type="submit">Start diagnosis</button>
+                </div>
+
+                {% if error %}
+                    <p class="form-error">{{ error }}</p>
+                {% endif %}
+
+                <fieldset>
+                    <legend>Run test from</legend>
+                    <div class="mode-options">
+                        <label class="mode-card">
+                            <input
+                                type="radio"
+                                name="mode"
+                                value="local"
+                                {% if mode != 'remote' %}checked{% endif %}
+                            >
+                            <span>
+                                <strong>Local Test</strong>
+                                <small>This computer and network</small>
+                            </span>
+                        </label>
+
+                        <label class="mode-card">
+                            <input
+                                type="radio"
+                                name="mode"
+                                value="remote"
+                                {% if mode == 'remote' %}checked{% endif %}
+                            >
+                            <span>
+                                <strong>Remote Test</strong>
+                                <small>Deployed ServicePath server</small>
+                            </span>
+                        </label>
+                    </div>
+                </fieldset>
+            </form>
+        </section>
+
+        <section class="workspace">
+            <div class="console-card">
+                <div class="card-heading">
+                    <div>
+                        <p class="eyebrow">LIVE OUTPUT</p>
+                        <h2>Diagnostic Console</h2>
+                    </div>
+                    <span class="console-dot"></span>
+                </div>
+
+                <div class="console">
+                    {% if submitted %}
+                        <p><span class="info">[INFO]</span> Target: {{ domain }}</p>
+                        <p><span class="info">[INFO]</span> Mode: {{ mode|title }} Test</p>
+                        <p><span class="ready">[READY]</span> The interface is ready for the diagnostic code.</p>
+                    {% elif error %}
+                        <p><span class="error">[ERROR]</span> {{ error }}</p>
+                    {% else %}
+                        <p><span class="ready">[READY]</span> Waiting for a website to test...</p>
+                        <p class="muted">Enter a domain above to begin.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="layers-card">
+                <div class="card-heading">
+                    <div>
+                        <p class="eyebrow">CHECKS</p>
+                        <h2>Diagnostic Layers</h2>
+                    </div>
+                </div>
+
+                <ol class="layers-list">
+                    <li><span>01</span><strong>Client Network</strong><em>Waiting</em></li>
+                    <li><span>02</span><strong>DNS</strong><em>Waiting</em></li>
+                    <li><span>03</span><strong>TCP</strong><em>Waiting</em></li>
+                    <li><span>04</span><strong>TLS</strong><em>Waiting</em></li>
+                    <li><span>05</span><strong>HTTP</strong><em>Waiting</em></li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="ai-card">
+            <div class="ai-icon">AI</div>
+            <div>
+                <p class="eyebrow">AI ANALYSIS</p>
+                <h2>Explanation and recommended actions</h2>
+                <p>AI guidance will appear here after all diagnostic layers finish.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        ServicePath &middot; Built with Flask
+    </footer>
+</body>
+</html>
