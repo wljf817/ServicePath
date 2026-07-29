@@ -3,7 +3,23 @@ import {Card} from "@heroui/react";
 import {ClockIcon} from "./Icons";
 import StatusBadge from "./StatusBadge";
 
-const waitingLayers = ["Client Network", "DNS", "TCP", "TLS", "HTTP"];
+const waitingLayers = [
+    {key: "client", name: "Client Network"},
+    {key: "dns", name: "DNS"},
+    {key: "traceroute", name: "Traceroute"},
+    {key: "tcp", name: "TCP"},
+    {key: "tls", name: "TLS"},
+    {key: "http", name: "HTTP"},
+];
+
+const layerNumbers = {
+    client: "01",
+    dns: "02",
+    traceroute: "TR",
+    tcp: "03",
+    tls: "04",
+    http: "05",
+};
 
 function detailLines(value, prefix = "") {
     const lines = [];
@@ -22,19 +38,24 @@ function detailLines(value, prefix = "") {
 }
 
 export default function LayerList({report}) {
-    const layers = report?.layers || waitingLayers.map((name, index) => ({
-        key: String(index),
-        name,
-        status: "waiting",
-        summary: "Waiting to run",
-        duration_ms: 0,
-    }));
+    const layers = report
+        ? report.layers.flatMap((layer) => (
+            layer.key === "dns" && report.traceroute
+                ? [layer, report.traceroute]
+                : [layer]
+        ))
+        : waitingLayers.map((layer) => ({
+            ...layer,
+            status: "waiting",
+            summary: "Waiting to run",
+            duration_ms: 0,
+        }));
 
     return (
         <Card className="layers-panel" variant="secondary">
             <Card.Header className="panel-header">
                 <div>
-                    <span className="section-kicker">FIVE LAYERS</span>
+                    <span className="section-kicker">FIVE LAYERS + ROUTE TRACE</span>
                     <Card.Title className="panel-title">Path overview</Card.Title>
                 </div>
             </Card.Header>
@@ -44,11 +65,17 @@ export default function LayerList({report}) {
                     return (
                         <div className={`layer-block layer-block-${layer.status}`} key={layer.key}>
                             <div className="layer-row">
-                                <div className="layer-index">{String(index + 1).padStart(2, "0")}</div>
+                                <div className="layer-index">
+                                    {layerNumbers[layer.key] || String(index + 1).padStart(2, "0")}
+                                </div>
                                 <div className="layer-copy">
                                     <div>
                                         <strong>{layer.name}</strong>
-                                        {layer.duration_ms > 0 && <span><ClockIcon size={13} /> {layer.duration_ms} ms</span>}
+                                        {layer.duration_ms > 0 && (
+                                            <span>
+                                                <ClockIcon size={13} /> {layer.duration_ms} ms
+                                            </span>
+                                        )}
                                     </div>
                                     <p>{layer.summary}</p>
                                 </div>
@@ -59,7 +86,9 @@ export default function LayerList({report}) {
                                     {details.map((detail) => (
                                         <div className="layer-return" key={detail.label}>
                                             <span>{detail.label}</span>
-                                            <code>{detail.display}</code>
+                                            <code className={detail.display.includes("\n") ? "layer-multiline" : ""}>
+                                                {detail.display}
+                                            </code>
                                         </div>
                                     ))}
                                 </div>

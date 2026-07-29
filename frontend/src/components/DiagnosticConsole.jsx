@@ -26,6 +26,14 @@ function detailLines(value, prefix = "") {
 }
 
 export default function DiagnosticConsole({report, label = "Diagnostic Console", loading = false}) {
+    const checks = report
+        ? report.layers.flatMap((layer) => (
+            layer.key === "dns" && report.traceroute
+                ? [layer, report.traceroute]
+                : [layer]
+        ))
+        : [];
+
     return (
         <Card className="console-panel" variant="secondary">
             <Card.Header className="panel-header">
@@ -54,7 +62,7 @@ export default function DiagnosticConsole({report, label = "Diagnostic Console",
                     <>
                         <p><span className="term-info">[INFO]</span> Target: {report.target.url}</p>
                         <p><span className="term-info">[INFO]</span> Mode: {report.mode}</p>
-                        {report.layers.map((layer) => (
+                        {checks.map((layer) => (
                             <div className="terminal-group" key={layer.key}>
                                 <p><span className="term-check">[CHECK]</span> {layer.name}</p>
                                 <p className="terminal-indent">
