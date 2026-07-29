@@ -227,15 +227,23 @@
 }
 
 .history-target strong {
+    display: block;
+    overflow: hidden;
     color: #d8e2ef;
     font-size: 12px;
     font-weight: 640;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .history-target span {
+    display: block;
+    overflow: hidden;
     margin-top: 5px;
     color: #6f7f94;
     font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mode-label {
@@ -286,7 +294,11 @@
 }
 
 .empty-state {
+    display: grid;
     min-height: 290px;
+    place-content: center;
+    justify-items: center;
+    gap: 10px;
     color: #66778d;
 }
 
@@ -421,6 +433,8 @@
 }
 
 .compare-console-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
 }
 
@@ -431,6 +445,7 @@
 
 .comparison-panel > div {
     padding: 14px 20px 20px !important;
+    overflow-x: auto;
 }
 
 .comparison-table {
@@ -439,6 +454,7 @@
 
 .comparison-head,
 .comparison-row {
+    display: grid;
     grid-template-columns: 0.55fr 1fr 1fr;
     gap: 18px;
     padding: 13px 10px;
@@ -527,6 +543,7 @@
     color: #c0cad8;
     font-size: 12px;
     line-height: 1.8;
+    white-space: pre-wrap;
 }
 
 .analysis-panel h3 {
@@ -535,10 +552,14 @@
 }
 
 .issue-stack {
+    display: grid;
     gap: 8px;
 }
 
 .issue-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 11px;
     padding: 12px;
     border-color: rgba(148, 163, 184, 0.12);
     background: rgba(6, 11, 19, 0.4);
@@ -596,12 +617,15 @@
 }
 
 .role-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 9px;
     margin-bottom: 26px;
 }
 
 .role-option {
     position: relative;
+    display: flex;
     gap: 11px;
     min-height: 92px;
     padding: 14px;
@@ -609,6 +633,8 @@
     border-radius: 12px;
     background: rgba(6, 11, 19, 0.43);
     color: #d0d9e6;
+    cursor: pointer;
+    text-align: left;
     transition: border-color 190ms ease, background 190ms ease, transform 200ms var(--sp-ease);
 }
 
@@ -623,9 +649,15 @@
 }
 
 .role-radio {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
     width: 17px;
     height: 17px;
     border-color: #516178;
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 50%;
 }
 
 .role-selected .role-radio {
@@ -637,14 +669,17 @@
     width: 7px;
     height: 7px;
     background: var(--sp-blue);
+    border-radius: 50%;
 }
 
 .role-option strong {
+    display: block;
     color: #cbd5e3;
     font-size: 11px;
 }
 
 .role-option small {
+    display: block;
     margin-top: 5px;
     color: #718096;
     font-size: 9px;
@@ -695,6 +730,7 @@
 }
 
 .settings-field {
+    display: block;
     margin-top: 16px;
 }
 
@@ -703,6 +739,7 @@
 }
 
 .settings-field > span {
+    display: block;
     margin-bottom: 8px;
     color: #a9b6c8;
     font-size: 10px;
@@ -710,11 +747,24 @@
 }
 
 .settings-field > div > svg {
+    position: absolute;
+    z-index: 2;
     left: 14px;
     color: #687c95;
 }
 
+.settings-field > div {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.settings-field > div > input {
+    padding-left: 36px !important;
+}
+
 .settings-field input {
+    width: 100%;
     min-height: 44px;
     border: 1px solid rgba(148, 163, 184, 0.14) !important;
     border-radius: 11px !important;
@@ -730,6 +780,7 @@
 }
 
 .settings-field small {
+    display: block;
     margin-top: 7px;
     color: #63738a;
     font-size: 9px;
@@ -737,18 +788,28 @@
 }
 
 .config-row {
+    display: grid;
     grid-template-columns: 36px minmax(0, 1fr) auto;
     gap: 12px;
     padding: 14px 0;
     border-color: rgba(148, 163, 184, 0.09);
+    align-items: center;
 }
 
 .config-icon {
+    display: grid;
     width: 34px;
     height: 34px;
+    place-items: center;
     border: 1px solid rgba(148, 163, 184, 0.11);
     border-radius: 10px;
     background: rgba(148, 163, 184, 0.055);
+}
+
+.config-icon i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
 }
 
 .config-icon i {
@@ -766,11 +827,13 @@
 }
 
 .config-row strong {
+    display: block;
     color: #cbd5e2;
     font-size: 11px;
 }
 
 .config-row p {
+    margin: 3px 0 0;
     color: #6d7d92;
     font-size: 9px;
 }
@@ -878,6 +941,12 @@
 
     .report-metric:nth-child(4) {
         border-top: 1px solid rgba(148, 163, 184, 0.09);
+    }
+}
+
+@media (max-width: 900px) {
+    .compare-console-grid {
+        grid-template-columns: 1fr;
     }
 }
 

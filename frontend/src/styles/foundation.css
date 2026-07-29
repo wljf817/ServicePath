@@ -1,4 +1,13 @@
 :root {
+    --background: #070b12;
+    --foreground: #f2f6fc;
+    --surface: #0c1320;
+    --surface-secondary: #111b2b;
+    --accent: #6ea8fe;
+    --accent-foreground: #07101d;
+    --muted: #7f8da3;
+    --border: #253044;
+    --radius: 1rem;
     --sp-bg: #070b12;
     --sp-bg-soft: #0a101b;
     --sp-panel: rgba(12, 19, 32, 0.9);
@@ -26,13 +35,19 @@
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+* {
+    box-sizing: border-box;
+}
+
 html {
     background: var(--sp-bg);
     scroll-behavior: smooth;
 }
 
 body {
+    margin: 0;
     min-width: 320px;
+    min-height: 100vh;
     background: var(--sp-bg);
     color: var(--sp-text);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -147,8 +162,15 @@ input {
 }
 
 .brand {
+    display: flex;
     gap: 12px;
+    align-items: center;
+    width: fit-content;
+    border: 0;
+    background: transparent;
     color: var(--sp-text);
+    cursor: pointer;
+    text-align: left;
 }
 
 .brand-mark {
@@ -185,12 +207,14 @@ input {
 }
 
 .brand strong {
+    display: block;
     font-size: 15px;
     font-weight: 720;
     letter-spacing: -0.015em;
 }
 
 .brand small {
+    display: block;
     margin-top: 2px;
     color: var(--sp-muted);
     font-size: 10px;
@@ -199,6 +223,7 @@ input {
 }
 
 .main-nav {
+    display: flex;
     gap: 4px;
     padding: 4px;
     border-color: rgba(148, 163, 184, 0.12);
@@ -248,8 +273,10 @@ input {
 }
 
 .system-online {
+    display: flex;
     gap: 9px;
     color: #78869a;
+    justify-self: end;
     font-size: 11px;
     font-weight: 650;
 }
@@ -257,6 +284,7 @@ input {
 .system-online i {
     width: 7px;
     height: 7px;
+    border-radius: 50%;
     background: var(--sp-green);
     box-shadow: 0 0 9px rgba(74, 222, 164, 0.75);
 }
@@ -282,9 +310,12 @@ input {
 
 .app-footer {
     position: relative;
+    display: flex;
+    justify-content: space-between;
     align-items: flex-end;
     width: min(1280px, calc(100% - 48px));
     padding: 26px 0 34px;
+    border-top: 1px solid rgba(148, 163, 184, 0.1);
     border-color: rgba(148, 163, 184, 0.1);
     color: #647185;
     font-size: 11px;
@@ -301,6 +332,8 @@ input {
 }
 
 .section-kicker {
+    display: block;
+    margin-bottom: 6px;
     color: var(--sp-blue-bright);
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     font-size: 10px;
@@ -327,6 +360,10 @@ input {
 }
 
 .page-loading {
+    display: grid;
+    min-height: 60vh;
+    place-content: center;
+    justify-items: center;
     color: var(--sp-muted);
 }
 
@@ -341,14 +378,21 @@ input {
     }
 
     .main-nav {
+        position: fixed;
+        z-index: 60;
         right: 12px;
         bottom: calc(12px + env(safe-area-inset-bottom));
         left: 12px;
+        justify-content: center;
         padding: 6px;
         border: 1px solid var(--sp-border-strong);
         background: rgba(9, 15, 25, 0.94);
         box-shadow: 0 18px 50px rgba(0, 0, 0, 0.48);
         backdrop-filter: blur(22px);
+    }
+
+    .system-online {
+        display: none;
     }
 
     .nav-button {

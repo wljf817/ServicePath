@@ -369,6 +369,10 @@
 }
 
 .form-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-start;
     margin-bottom: 26px;
 }
 
@@ -395,6 +399,7 @@
 }
 
 .field-label {
+    display: block;
     margin-bottom: 9px;
     color: #aebacd;
     font-size: 11px;
@@ -402,15 +407,26 @@
 }
 
 .domain-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 10px;
 }
 
 .domain-input-wrap > svg {
+    position: absolute;
+    z-index: 2;
     left: 18px;
     color: #71849d;
 }
 
+.domain-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
 .domain-input {
+    width: 100%;
     min-height: 58px;
     padding-left: 39px !important;
     border: 1px solid rgba(148, 163, 184, 0.16) !important;
@@ -486,11 +502,14 @@
 }
 
 .mode-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
     margin-top: 0;
 }
 
 .mode-option {
+    position: relative;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 12px;
@@ -576,9 +595,15 @@
 }
 
 .mode-radio {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
     width: 17px;
     height: 17px;
     border-color: #4b5d74;
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 50%;
 }
 
 .mode-selected .mode-radio {
@@ -590,13 +615,17 @@
     width: 7px;
     height: 7px;
     background: var(--sp-blue);
+    border-radius: 50%;
 }
 
 .mode-option em {
+    position: absolute;
     top: 7px;
     right: 8px;
     color: #7f8da0;
     font-size: 8px;
+    font-style: normal;
+    text-transform: uppercase;
 }
 
 .scan-progress {
@@ -719,9 +748,11 @@
 }
 
 .dashboard-grid {
+    display: grid;
     grid-template-columns: minmax(0, 1.32fr) minmax(350px, 0.68fr);
     gap: 18px;
     margin-top: 20px;
+    align-items: start;
 }
 
 .console-panel,
@@ -730,6 +761,10 @@
 }
 
 .panel-header {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between;
+    align-items: center !important;
     min-height: 76px;
     padding: 18px 20px !important;
     border-color: rgba(148, 163, 184, 0.11);
@@ -737,6 +772,9 @@
 }
 
 .panel-title {
+    display: flex !important;
+    gap: 8px;
+    align-items: center;
     color: #dce5f2;
     font-size: 14px !important;
     font-weight: 650;
@@ -745,6 +783,7 @@
 .live-dot {
     width: 7px;
     height: 7px;
+    border-radius: 50%;
     background: var(--sp-green);
     box-shadow: 0 0 10px rgba(74, 222, 164, 0.78);
 }
