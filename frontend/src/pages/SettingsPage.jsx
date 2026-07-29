@@ -34,6 +34,10 @@ export default function SettingsPage({appSettings, onSaved}) {
     const [role, setRole] = useState("remote_server");
     const [remoteUrl, setRemoteUrl] = useState("");
     const [password, setPassword] = useState("");
+    const [apiToken, setApiToken] = useState("");
+    const [openaiKey, setOpenaiKey] = useState("");
+    const [openaiModel, setOpenaiModel] = useState("gpt-5.6");
+    const [newSettingsPassword, setNewSettingsPassword] = useState("");
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
@@ -42,8 +46,9 @@ export default function SettingsPage({appSettings, onSaved}) {
         if (settings) {
             setRole(settings.instance_role);
             setRemoteUrl(settings.remote_service_url);
+            setOpenaiModel(appSettings.openai_model);
         }
-    }, [settings]);
+    }, [appSettings, settings]);
 
     async function submit(event) {
         event.preventDefault();
@@ -56,9 +61,16 @@ export default function SettingsPage({appSettings, onSaved}) {
                 instance_role: role,
                 remote_service_url: remoteUrl,
                 settings_password: password,
+                servicepath_api_token: apiToken,
+                openai_api_key: openaiKey,
+                openai_model: openaiModel,
+                new_settings_password: newSettingsPassword,
             });
             onSaved(result);
             setPassword("");
+            setApiToken("");
+            setOpenaiKey("");
+            setNewSettingsPassword("");
             setMessage("Settings saved successfully.");
         } catch (requestError) {
             setError(requestError.message);
@@ -81,7 +93,7 @@ export default function SettingsPage({appSettings, onSaved}) {
                 </div>
             </section>
 
-            <div className="settings-grid">
+            <form className="settings-grid" onSubmit={submit}>
                 <Card className="settings-panel" variant="secondary">
                     <Card.Header>
                         <div>
@@ -91,40 +103,39 @@ export default function SettingsPage({appSettings, onSaved}) {
                         </div>
                     </Card.Header>
                     <Card.Content>
-                        <form onSubmit={submit}>
-                            <div className="role-options">
-                                {roles.map((item) => (
-                                    <button
-                                        className={`role-option ${role === item.value ? "role-selected" : ""}`}
-                                        key={item.value}
-                                        onClick={() => setRole(item.value)}
-                                        type="button"
-                                    >
-                                        <span className="role-radio"><i /></span>
-                                        <span><strong>{item.title}</strong><small>{item.description}</small></span>
-                                    </button>
-                                ))}
-                            </div>
+                        <div className="role-options">
+                            {roles.map((item) => (
+                                <button
+                                    className={`role-option ${role === item.value ? "role-selected" : ""}`}
+                                    key={item.value}
+                                    onClick={() => setRole(item.value)}
+                                    type="button"
+                                >
+                                    <span className="role-radio"><i /></span>
+                                    <span><strong>{item.title}</strong><small>{item.description}</small></span>
+                                </button>
+                            ))}
+                        </div>
 
-                            <label className="settings-field">
-                                <span>Deployed ServicePath URL</span>
-                                <div><GlobeIcon size={17} /><Input onChange={(event) => setRemoteUrl(event.target.value)} placeholder="https://servicepath.example" value={remoteUrl} variant="secondary" /></div>
-                                <small>Required by a Local Device for Remote Test and Compare Both.</small>
-                            </label>
+                        <label className="settings-field">
+                            <span>Deployed ServicePath URL</span>
+                            <div><GlobeIcon size={17} /><Input onChange={(event) => setRemoteUrl(event.target.value)} placeholder="https://servicepath.example" value={remoteUrl} variant="secondary" /></div>
+                            <small>Required by a Local Device for Remote Test and Compare Both.</small>
+                        </label>
 
-                            <label className="settings-field">
-                                <span>Settings password</span>
-                                <Input onChange={(event) => setPassword(event.target.value)} placeholder={appSettings.password_required ? "Required on this server" : "Not required from localhost"} type="password" value={password} variant="secondary" />
-                            </label>
+                        <label className="settings-field">
+                            <span>Current settings password</span>
+                            <Input onChange={(event) => setPassword(event.target.value)} placeholder={appSettings.password_required ? "Required to save changes" : "Not required from localhost"} type="password" value={password} variant="secondary" />
+                            <small>Authenticates this settings update when a password already exists.</small>
+                        </label>
 
-                            {message && <p className="success-message">{message}</p>}
-                            {error && <p className="form-error">{error}</p>}
+                        {message && <p className="success-message">{message}</p>}
+                        {error && <p className="form-error">{error}</p>}
 
-                            <Button className="save-button" isDisabled={saving} isPending={saving} type="submit" variant="primary">
-                                {saving && <Spinner color="current" size="sm" />}
-                                {saving ? "Saving" : "Save settings"}
-                            </Button>
-                        </form>
+                        <Button className="save-button" isDisabled={saving} isPending={saving} type="submit" variant="primary">
+                            {saving && <Spinner color="current" size="sm" />}
+                            {saving ? "Saving" : "Save all settings"}
+                        </Button>
                     </Card.Content>
                 </Card>
 
@@ -151,13 +162,54 @@ export default function SettingsPage({appSettings, onSaved}) {
                             label="Settings password"
                             ready={appSettings.password_required}
                         />
+                        <div className="secret-fields">
+                            <label className="settings-field">
+                                <span>Remote API token</span>
+                                <Input
+                                    onChange={(event) => setApiToken(event.target.value)}
+                                    placeholder="Leave blank to keep the current token"
+                                    type="password"
+                                    value={apiToken}
+                                    variant="secondary"
+                                />
+                            </label>
+                            <label className="settings-field">
+                                <span>OpenAI API key</span>
+                                <Input
+                                    onChange={(event) => setOpenaiKey(event.target.value)}
+                                    placeholder="Leave blank to keep the current key"
+                                    type="password"
+                                    value={openaiKey}
+                                    variant="secondary"
+                                />
+                            </label>
+                            <label className="settings-field">
+                                <span>OpenAI model</span>
+                                <Input
+                                    onChange={(event) => setOpenaiModel(event.target.value)}
+                                    placeholder="gpt-5.6"
+                                    value={openaiModel}
+                                    variant="secondary"
+                                />
+                            </label>
+                            <label className="settings-field">
+                                <span>New settings password</span>
+                                <Input
+                                    onChange={(event) => setNewSettingsPassword(event.target.value)}
+                                    placeholder="Leave blank to keep the current password"
+                                    type="password"
+                                    value={newSettingsPassword}
+                                    variant="secondary"
+                                />
+                            </label>
+                        </div>
                         <p className="security-copy">
-                            Secrets remain in the server <code>.env</code> file and are never
-                            returned to this page or saved in SQLite.
+                            New secrets are written to the server <code>.env</code> file.
+                            Existing values are never returned to this page or saved in SQLite.
                         </p>
                     </Card.Content>
                 </Card>
-            </div>
+            </form>
         </>
     );
 }
