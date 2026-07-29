@@ -88,8 +88,8 @@ export default function SettingsPage({appSettings, onSaved}) {
             <section className="page-heading">
                 <div>
                     <span className="hero-pill"><SettingsIcon size={15} /> Application settings</span>
-                    <h1>Choose where tests run</h1>
-                    <p>Configure this Flask instance without exposing API keys or tokens.</p>
+                    <h1>Configure your workspace</h1>
+                    <p>Choose where tests run and connect the services used by this instance.</p>
                 </div>
             </section>
 
@@ -117,25 +117,16 @@ export default function SettingsPage({appSettings, onSaved}) {
                             ))}
                         </div>
 
+                        <div className="settings-subheading">
+                            <span className="settings-subheading-icon">01</span>
+                            <div><strong>Remote connection</strong><small>Where remote requests should be sent.</small></div>
+                        </div>
+
                         <label className="settings-field">
                             <span>Deployed ServicePath URL</span>
                             <div><GlobeIcon size={17} /><Input onChange={(event) => setRemoteUrl(event.target.value)} placeholder="https://servicepath.example" value={remoteUrl} variant="secondary" /></div>
                             <small>Required by a Local Device for Remote Test and Compare Both.</small>
                         </label>
-
-                        <label className="settings-field">
-                            <span>Current settings password</span>
-                            <Input onChange={(event) => setPassword(event.target.value)} placeholder={appSettings.password_required ? "Required to save changes" : "Not required from localhost"} type="password" value={password} variant="secondary" />
-                            <small>Authenticates this settings update when a password already exists.</small>
-                        </label>
-
-                        {message && <p className="success-message">{message}</p>}
-                        {error && <p className="form-error">{error}</p>}
-
-                        <Button className="save-button" isDisabled={saving} isPending={saving} type="submit" variant="primary">
-                            {saving && <Spinner color="current" size="sm" />}
-                            {saving ? "Saving" : "Save all settings"}
-                        </Button>
                     </Card.Content>
                 </Card>
 
@@ -162,7 +153,11 @@ export default function SettingsPage({appSettings, onSaved}) {
                             label="Settings password"
                             ready={appSettings.password_required}
                         />
-                        <div className="secret-fields">
+                        <div className="secret-fields settings-secret-group">
+                            <div className="settings-subheading">
+                                <span className="settings-subheading-icon">02</span>
+                                <div><strong>Remote service</strong><small>Authenticate calls between ServicePath instances.</small></div>
+                            </div>
                             <label className="settings-field">
                                 <span>Remote API token</span>
                                 <Input
@@ -173,6 +168,12 @@ export default function SettingsPage({appSettings, onSaved}) {
                                     variant="secondary"
                                 />
                             </label>
+                        </div>
+                        <div className="settings-secret-group">
+                            <div className="settings-subheading">
+                                <span className="settings-subheading-icon settings-ai-icon">AI</span>
+                                <div><strong>AI analysis</strong><small>Generate explanations and practical next steps.</small></div>
+                            </div>
                             <label className="settings-field">
                                 <span>OpenAI API key</span>
                                 <Input
@@ -192,6 +193,23 @@ export default function SettingsPage({appSettings, onSaved}) {
                                     variant="secondary"
                                 />
                             </label>
+                        </div>
+                        <div className="settings-secret-group">
+                            <div className="settings-subheading">
+                                <span className="settings-subheading-icon">03</span>
+                                <div><strong>Settings access</strong><small>Protect configuration changes on this server.</small></div>
+                            </div>
+                            <label className="settings-field">
+                                <span>Current settings password</span>
+                                <Input
+                                    onChange={(event) => setPassword(event.target.value)}
+                                    placeholder={appSettings.password_required ? "Required to save changes" : "Not required from localhost"}
+                                    type="password"
+                                    value={password}
+                                    variant="secondary"
+                                />
+                                <small>Authenticates this update when a password already exists.</small>
+                            </label>
                             <label className="settings-field">
                                 <span>New settings password</span>
                                 <Input
@@ -209,6 +227,18 @@ export default function SettingsPage({appSettings, onSaved}) {
                         </p>
                     </Card.Content>
                 </Card>
+
+                <div className="settings-save-bar">
+                    <div aria-live="polite">
+                        {message && <p className="success-message" role="status">{message}</p>}
+                        {error && <p className="form-error" role="alert">{error}</p>}
+                        {!message && !error && <p>Changes apply to the next diagnosis.</p>}
+                    </div>
+                    <Button className="save-button" isDisabled={saving} isPending={saving} type="submit" variant="primary">
+                        {saving && <Spinner color="current" size="sm" />}
+                        {saving ? "Saving settings" : "Save all settings"}
+                    </Button>
+                </div>
             </form>
         </>
     );

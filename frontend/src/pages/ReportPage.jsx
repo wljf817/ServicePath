@@ -8,6 +8,22 @@ import {ArrowIcon} from "../components/Icons";
 import LayerList from "../components/LayerList";
 import StatusBadge from "../components/StatusBadge";
 
+function formatDate(value) {
+    return new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+    }).format(new Date(value));
+}
+
+function ReportMetric({label, value}) {
+    return (
+        <div className="report-metric">
+            <span>{label}</span>
+            <strong>{value}</strong>
+        </div>
+    );
+}
+
 function CompareTable({report}) {
     return (
         <Card className="comparison-panel" variant="secondary">
@@ -56,16 +72,24 @@ export default function ReportPage({reportId, navigate}) {
     return (
         <>
             <section className={`report-hero report-${report.status}`}>
-                <div>
-                    <span className="section-kicker">DIAGNOSTIC REPORT · #{report.id}</span>
-                    <h1>{compare ? report.comparison.title : report.target.hostname}</h1>
-                    <p>{compare ? report.comparison.summary : report.target.url}</p>
+                <div className="report-hero-main">
+                    <div>
+                        <span className="section-kicker">DIAGNOSTIC REPORT · #{report.id}</span>
+                        <h1>{compare ? report.comparison.title : report.target.hostname}</h1>
+                        <p>{compare ? report.comparison.summary : report.target.url}</p>
+                    </div>
+                    <div className="report-actions">
+                        <StatusBadge status={report.status} />
+                        <Button onPress={() => navigate("/")} size="sm" variant="secondary">
+                            New test <ArrowIcon size={15} />
+                        </Button>
+                    </div>
                 </div>
-                <div className="report-actions">
-                    <StatusBadge status={report.status} />
-                    <Button onPress={() => navigate("/")} size="sm" variant="secondary">
-                        New test <ArrowIcon size={15} />
-                    </Button>
+                <div className="report-metrics" aria-label="Report summary">
+                    <ReportMetric label="Duration" value={`${report.duration_ms} ms`} />
+                    <ReportMetric label="First issue" value={report.first_problem?.toUpperCase() || "None found"} />
+                    <ReportMetric label="Run location" value={compare ? "Local + remote" : report.mode} />
+                    <ReportMetric label="Completed" value={formatDate(report.created_at)} />
                 </div>
             </section>
 
