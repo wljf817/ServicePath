@@ -1,22 +1,44 @@
-import {Button, Card} from "@heroui/react";
+import {useEffect, useState} from "react";
+
+import {getAppSettings} from "./api";
+import DashboardPage from "./pages/DashboardPage";
+import ReportPage from "./pages/ReportPage";
+import Shell from "./components/Shell";
+
+function currentPath() {
+    return window.location.pathname;
+}
 
 export default function App() {
+    const [path, setPath] = useState(currentPath());
+    const [appSettings, setAppSettings] = useState(null);
+
+    useEffect(() => {
+        getAppSettings().then(setAppSettings).catch(() => setAppSettings(null));
+
+        function updatePath() {
+            setPath(currentPath());
+        }
+
+        window.addEventListener("popstate", updatePath);
+        return () => window.removeEventListener("popstate", updatePath);
+    }, []);
+
+    function navigate(nextPath) {
+        window.history.pushState({}, "", nextPath);
+        setPath(nextPath);
+        window.scrollTo({top: 0, behavior: "smooth"});
+    }
+
+    const reportMatch = path.match(/^\/reports\/(\d+)$/);
+
     return (
-        <main className="min-h-screen bg-background p-8 text-foreground">
-            <Card className="mx-auto max-w-xl">
-                <Card.Header>
-                    <Card.Title>ServicePath</Card.Title>
-                    <Card.Description>
-                        Five-layer website diagnostics
-                    </Card.Description>
-                </Card.Header>
-                <Card.Content>
-                    <p>The HeroUI frontend is ready.</p>
-                </Card.Content>
-                <Card.Footer>
-                    <Button variant="primary">Start diagnosis</Button>
-                </Card.Footer>
-            </Card>
-        </main>
+        <Shell path={path} navigate={navigate}>
+            {reportMatch ? (
+                <ReportPage reportId={reportMatch[1]} navigate={navigate} />
+            ) : (
+                <DashboardPage appSettings={appSettings} navigate={navigate} />
+            )}
+        </Shell>
     );
 }
