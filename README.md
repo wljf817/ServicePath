@@ -12,9 +12,9 @@ Every layer reports **Passed**, **Warning**, **Error**, or **Skipped**. ServiceP
 
 The interface has three modes:
 
-- **Local Test:** runs from the computer hosting the current Flask process.
-- **Remote Test:** asks a configured deployed ServicePath server to run the checks.
-- **Compare Both:** runs both tests and classifies the result as local-only, remote-only, shared, different, or no issue.
+- **Remote Test:** runs directly on the deployed ServicePath server. This is the default mode.
+- **Local Test:** runs from a ServicePath instance started on the user's computer.
+- **Compare Both:** is available from the local instance and classifies the result as local-only, remote-only, shared, different, or no issue.
 
 ## Project structure
 
@@ -59,18 +59,37 @@ OPENAI_MODEL=gpt-5.6
 
 Keys are read from the environment and `.env` is ignored by Git. The integration uses the OpenAI Responses API. If the API is unavailable, diagnostics still complete with rule-based guidance.
 
-## Remote Test setup
+## Settings and execution location
 
-Deploy a second ServicePath instance, then configure the local instance:
+Open `/settings` to choose the role of the current Flask process:
+
+- **Deployed Remote Server:** Remote Test runs on the current server. This is the default and recommended role for the hosted website.
+- **Local Device:** Local Test runs on the current computer. Enter the deployed server URL to enable Remote Test and Compare Both.
+
+On a public deployment, set an administrator password before changing settings:
 
 ```text
-REMOTE_SERVICE_URL=https://your-servicepath-server.example
+SETTINGS_PASSWORD=choose-a-strong-password
+```
+
+Localhost can update settings without a password. API keys and tokens are never stored in the settings database.
+
+## Connect a local instance to the deployed server
+
+On the deployed server, set:
+
+```text
+SERVICEPATH_API_TOKEN=choose-a-long-random-token
+SETTINGS_PASSWORD=choose-a-strong-password
+```
+
+On the user's computer, start ServicePath, open Settings, select **Local Device**, and enter the deployed URL. Set the same token in the local `.env`:
+
+```text
 SERVICEPATH_API_TOKEN=choose-a-long-random-token
 ```
 
-Set the same `SERVICEPATH_API_TOKEN` on the remote instance. Remote Test calls `POST /api/diagnose`; the target checks run from the deployed server, while the returned report is analyzed and saved by the local app.
-
-Compare Both requires the same remote configuration. It stores the two complete reports, a five-layer side-by-side comparison, and one combined analysis in SQLite.
+The local instance calls `POST /api/diagnose` on the deployed server. Compare Both stores the two complete reports, a five-layer side-by-side comparison, and one combined analysis in SQLite.
 
 ## Course requirements completed
 
@@ -82,6 +101,7 @@ Compare Both requires the same remote configuration. It stores the two complete 
 
 - Console lines appear when the request finishes; they are not streamed live.
 - Compare Both runs Local Test and Remote Test one after the other, so it takes longer than either individual mode.
+- A deployed webpage cannot perform raw DNS, TCP, or TLS checks from a visitor's device. Local Test and Compare Both therefore require the user to start the local Flask instance.
 - Client Network reports local routes and proxy presence, not public IP, ISP, ASN, or location.
 - DNS uses the system resolver and does not yet compare public resolvers or query CNAME/WHOIS data.
 - SQLite requires a persistent filesystem when deployed; a temporary serverless filesystem will lose history.
