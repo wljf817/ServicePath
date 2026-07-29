@@ -1,0 +1,163 @@
+import {Button, Card, Input, Spinner} from "@heroui/react";
+import {useEffect, useState} from "react";
+
+import {saveAppSettings} from "../api";
+import {GlobeIcon, SettingsIcon} from "../components/Icons";
+
+const roles = [
+    {
+        value: "remote_server",
+        title: "Deployed Remote Server",
+        description: "Remote Test runs on this Flask server.",
+    },
+    {
+        value: "local_device",
+        title: "Local Device",
+        description: "Local Test runs here; Remote Test calls the configured server.",
+    },
+];
+
+function ConfigurationStatus({ready, label, description}) {
+    return (
+        <div className="config-row">
+            <span className={ready ? "config-icon config-ready" : "config-icon"}><i /></span>
+            <div><strong>{label}</strong><p>{description}</p></div>
+            <span className={ready ? "config-state ready" : "config-state"}>
+                {ready ? "Configured" : "Not configured"}
+            </span>
+        </div>
+    );
+}
+
+export default function SettingsPage({appSettings, onSaved}) {
+    const settings = appSettings?.settings;
+    const [role, setRole] = useState("remote_server");
+    const [remoteUrl, setRemoteUrl] = useState("");
+    const [password, setPassword] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState("");
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (settings) {
+            setRole(settings.instance_role);
+            setRemoteUrl(settings.remote_service_url);
+        }
+    }, [settings]);
+
+    async function submit(event) {
+        event.preventDefault();
+        setSaving(true);
+        setMessage("");
+        setError("");
+
+        try {
+            const result = await saveAppSettings({
+                instance_role: role,
+                remote_service_url: remoteUrl,
+                settings_password: password,
+            });
+            onSaved(result);
+            setPassword("");
+            setMessage("Settings saved successfully.");
+        } catch (requestError) {
+            setError(requestError.message);
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    if (!appSettings) {
+        return <div className="page-loading"><Spinner size="lg" /><p>Loading settings...</p></div>;
+    }
+
+    return (
+        <>
+            <section className="page-heading">
+                <div>
+                    <span className="hero-pill"><SettingsIcon size={15} /> Application settings</span>
+                    <h1>Choose where tests run</h1>
+                    <p>Configure this Flask instance without exposing API keys or tokens.</p>
+                </div>
+            </section>
+
+            <div className="settings-grid">
+                <Card className="settings-panel" variant="secondary">
+                    <Card.Header>
+                        <div>
+                            <span className="section-kicker">EXECUTION</span>
+                            <Card.Title>Instance role</Card.Title>
+                            <Card.Description>Define how this copy of ServicePath should behave.</Card.Description>
+                        </div>
+                    </Card.Header>
+                    <Card.Content>
+                        <form onSubmit={submit}>
+                            <div className="role-options">
+                                {roles.map((item) => (
+                                    <button
+                                        className={`role-option ${role === item.value ? "role-selected" : ""}`}
+                                        key={item.value}
+                                        onClick={() => setRole(item.value)}
+                                        type="button"
+                                    >
+                                        <span className="role-radio"><i /></span>
+                                        <span><strong>{item.title}</strong><small>{item.description}</small></span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            <label className="settings-field">
+                                <span>Deployed ServicePath URL</span>
+                                <div><GlobeIcon size={17} /><Input onChange={(event) => setRemoteUrl(event.target.value)} placeholder="https://servicepath.example" value={remoteUrl} variant="secondary" /></div>
+                                <small>Required by a Local Device for Remote Test and Compare Both.</small>
+                            </label>
+
+                            <label className="settings-field">
+                                <span>Settings password</span>
+                                <Input onChange={(event) => setPassword(event.target.value)} placeholder={appSettings.password_required ? "Required on this server" : "Not required from localhost"} type="password" value={password} variant="secondary" />
+                            </label>
+
+                            {message && <p className="success-message">{message}</p>}
+                            {error && <p className="form-error">{error}</p>}
+
+                            <Button className="save-button" isDisabled={saving} isPending={saving} type="submit" variant="primary">
+                                {saving && <Spinner color="current" size="sm" />}
+                                {saving ? "Saving" : "Save settings"}
+                            </Button>
+                        </form>
+                    </Card.Content>
+                </Card>
+
+                <Card className="configuration-panel" variant="secondary">
+                    <Card.Header>
+                        <div>
+                            <span className="section-kicker">CONFIGURATION</span>
+                            <Card.Title>Service status</Card.Title>
+                        </div>
+                    </Card.Header>
+                    <Card.Content>
+                        <ConfigurationStatus
+                            description="Protects the remote diagnostic endpoint."
+                            label="Remote API token"
+                            ready={appSettings.api_token_configured}
+                        />
+                        <ConfigurationStatus
+                            description="Enables generated diagnosis and repair advice."
+                            label="OpenAI analysis"
+                            ready={appSettings.ai_configured}
+                        />
+                        <ConfigurationStatus
+                            description="Protects setting changes on a public server."
+                            label="Settings password"
+                            ready={appSettings.password_required}
+                        />
+                        <p className="security-copy">
+                            Secrets remain in the server <code>.env</code> file and are never
+                            returned to this page or saved in SQLite.
+                        </p>
+                    </Card.Content>
+                </Card>
+            </div>
+        </>
+    );
+}

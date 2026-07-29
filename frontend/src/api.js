@@ -17,6 +17,18 @@ export function getReport(reportId) {
     return request(`/api/reports/${reportId}`);
 }
 
+export function getHistory() {
+    return request("/api/history");
+}
+
+export function saveAppSettings(settings) {
+    return request("/api/app-settings", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(settings),
+    });
+}
+
 export function startDiagnosis(domain, mode) {
     const formData = new FormData();
     formData.append("domain", domain);
