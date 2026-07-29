@@ -28,6 +28,10 @@ app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 init_db(app.config["DATABASE"])
 
 
+def frontend_app():
+    return app.send_static_file("frontend/index.html")
+
+
 @app.template_filter("format_detail")
 def format_detail(value):
     if isinstance(value, list):
@@ -61,21 +65,12 @@ def console_details(details):
 
 @app.route("/")
 def index():
-    current_settings = get_settings(app.config["DATABASE"])
-    default_mode = (
-        "remote" if current_settings["instance_role"] == "remote_server" else "local"
-    )
-    return render_template(
-        "index.html",
-        mode=default_mode,
-        app_settings=current_settings,
-    )
+    return frontend_app()
 
 
 @app.route("/history")
 def history():
-    reports = list_reports(app.config["DATABASE"])
-    return render_template("history.html", reports=reports)
+    return frontend_app()
 
 
 def settings_authorized(supplied_password):
@@ -100,6 +95,9 @@ def app_settings_payload():
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings_page():
+    if request.method == "GET":
+        return frontend_app()
+
     current_settings = get_settings(app.config["DATABASE"])
     error = None
 
@@ -179,14 +177,7 @@ def view_report(report_id):
     report = get_report(app.config["DATABASE"], report_id)
     if not report:
         abort(404)
-    template = "compare.html" if report["mode"] == "compare" else "index.html"
-    return render_template(
-        template,
-        report=report,
-        domain=report["target"]["url"],
-        mode=report["mode"],
-        app_settings=get_settings(app.config["DATABASE"]),
-    )
+    return frontend_app()
 
 
 def diagnosis_error(message, status_code, domain, mode):
@@ -240,7 +231,9 @@ def api_diagnose():
     expected_token = os.getenv("SERVICEPATH_API_TOKEN", "").strip()
 
     if expected_token:
-        supplied_token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+        supplied_token = request.headers.get("Authorization", "").removeprefix(
+            "Bearer "
+        )
         if not hmac.compare_digest(supplied_token, expected_token):
             return jsonify({"error": "Unauthorized"}), 401
 

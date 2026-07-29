@@ -54,17 +54,21 @@ class RouteTests(unittest.TestCase):
     def tearDown(self):
         self.temporary_directory.cleanup()
 
+    def assert_frontend_response(self, response):
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'<div id="root"></div>', response.data)
+        self.assertIn(b"/static/frontend/assets/", response.data)
+        response.close()
+
     def test_home_page_loads(self):
         response = self.client.get("/")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Start diagnosis", response.data)
+        self.assert_frontend_response(response)
 
-    def test_settings_page_loads_default_role(self):
+    def test_settings_page_loads_frontend(self):
         response = self.client.get("/settings")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Deployed Remote Server", response.data)
+        self.assert_frontend_response(response)
 
     def test_frontend_settings_api_returns_configuration(self):
         response = self.client.get("/api/app-settings")
@@ -81,11 +85,9 @@ class RouteTests(unittest.TestCase):
                 "instance_role": "local_device",
                 "remote_service_url": "https://servicepath.example/",
             },
-            follow_redirects=True,
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Settings saved successfully", response.data)
+        self.assertEqual(response.status_code, 302)
         settings = get_settings(app.config["DATABASE"])
         self.assertEqual(settings["instance_role"], "local_device")
 
@@ -145,7 +147,7 @@ class RouteTests(unittest.TestCase):
 
     @patch("app.run_selected_diagnostics")
     @patch("app.analyze_report")
-    def test_local_diagnosis_displays_report(self, analyze_report, run_selected):
+    def test_local_diagnosis_saves_complete_report(self, analyze_report, run_selected):
         test_report = sample_report()
         test_report["layers"][1]["details"] = {
             "A records": ["93.184.216.34"],
@@ -157,17 +159,22 @@ class RouteTests(unittest.TestCase):
         response = self.client.post(
             "/diagnose",
             data={"domain": "example.com", "mode": "local"},
-            follow_redirects=True,
+            headers={"Accept": "application/json"},
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"DNS passed", response.data)
-        self.assertIn(b"AI analysis is not configured", response.data)
-        self.assertIn(b"[RETURN]", response.data)
-        self.assertIn(b"[RAW RETURN]", response.data)
-        self.assertIn(b'"key": "dns"', response.data)
-        self.assertIn(b"93.184.216.34", response.data)
-        self.assertIn(b"System resolver", response.data)
+        self.assertEqual(response.status_code, 201)
+        api_report_url = response.get_json()["report_url"].replace(
+            "/reports/",
+            "/api/reports/",
+        )
+        report_response = self.client.get(api_report_url)
+        saved_report = report_response.get_json()
+        self.assertEqual(saved_report["layers"][1]["key"], "dns")
+        self.assertEqual(
+            saved_report["layers"][1]["details"]["A records"],
+            ["93.184.216.34"],
+        )
+        self.assertEqual(saved_report["analysis"]["source"], "not_configured")
         run_selected.assert_called_once_with(
             "example.com",
             "local",
@@ -186,8 +193,7 @@ class RouteTests(unittest.TestCase):
 
         response = self.client.get("/history")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"https://example.com/", response.data)
+        self.assert_frontend_response(response)
 
         api_response = self.client.get("/api/history")
         self.assertEqual(api_response.status_code, 200)
@@ -196,7 +202,10 @@ class RouteTests(unittest.TestCase):
         report_id = api_response.get_json()["reports"][0]["id"]
         report_response = self.client.get(f"/api/reports/{report_id}")
         self.assertEqual(report_response.status_code, 200)
-        self.assertEqual(report_response.get_json()["target"]["url"], "https://example.com/")
+        self.assertEqual(
+            report_response.get_json()["target"]["url"],
+            "https://example.com/",
+        )
 
     def test_frontend_report_api_returns_not_found(self):
         response = self.client.get("/api/reports/999")
@@ -240,7 +249,7 @@ class RouteTests(unittest.TestCase):
 
     @patch("app.analyze_report")
     @patch("app.run_selected_diagnostics")
-    def test_remote_diagnosis_displays_report(self, run_selected, analyze_report):
+    def test_remote_diagnosis_saves_remote_report(self, run_selected, analyze_report):
         remote_report = sample_report()
         remote_report["mode"] = "remote"
         run_selected.return_value = remote_report
@@ -249,11 +258,14 @@ class RouteTests(unittest.TestCase):
         response = self.client.post(
             "/diagnose",
             data={"domain": "example.com", "mode": "remote"},
-            follow_redirects=True,
+            headers={"Accept": "application/json"},
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Remote Test", response.data)
+        self.assertEqual(response.status_code, 201)
+        report_url = response.get_json()["report_url"]
+        api_report_url = report_url.replace("/reports/", "/api/reports/")
+        report_response = self.client.get(api_report_url)
+        self.assertEqual(report_response.get_json()["mode"], "remote")
         run_selected.assert_called_once_with(
             "example.com",
             "remote",
@@ -262,7 +274,7 @@ class RouteTests(unittest.TestCase):
 
     @patch("app.analyze_report")
     @patch("app.run_selected_diagnostics")
-    def test_compare_both_displays_side_by_side_report(
+    def test_compare_both_saves_side_by_side_report(
         self,
         run_selected,
         analyze_report,
@@ -278,12 +290,16 @@ class RouteTests(unittest.TestCase):
         response = self.client.post(
             "/diagnose",
             data={"domain": "example.com", "mode": "compare"},
-            follow_redirects=True,
+            headers={"Accept": "application/json"},
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Layer comparison", response.data)
-        self.assertIn(b"AI analysis is not configured", response.data)
+        self.assertEqual(response.status_code, 201)
+        report_url = response.get_json()["report_url"]
+        api_report_url = report_url.replace("/reports/", "/api/reports/")
+        report_response = self.client.get(api_report_url)
+        saved_report = report_response.get_json()
+        self.assertEqual(saved_report["mode"], "compare")
+        self.assertIn("comparison", saved_report)
         run_selected.assert_called_once_with(
             "example.com",
             "compare",
