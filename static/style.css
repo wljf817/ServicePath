@@ -267,6 +267,8 @@ fieldset {
 
 .console {
     min-height: 270px;
+    max-height: 520px;
+    overflow-y: auto;
     padding: 22px;
     background: #15222d;
     color: #d9e3e8;
