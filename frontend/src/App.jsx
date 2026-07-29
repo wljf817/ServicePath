@@ -26,11 +26,27 @@ export default function App() {
         return () => window.removeEventListener("popstate", updatePath);
     }, []);
 
+    useEffect(() => {
+        const titles = {
+            "/": "Diagnostics · ServicePath",
+            "/history": "History · ServicePath",
+            "/settings": "Settings · ServicePath",
+        };
+        document.title = path.startsWith("/reports/")
+            ? "Diagnostic report · ServicePath"
+            : titles[path] || "ServicePath";
+
+        window.requestAnimationFrame(() => {
+            document.getElementById("main-content")?.focus({preventScroll: true});
+        });
+    }, [path]);
+
     function navigate(nextPath, options = {}) {
         window.history.pushState({}, "", nextPath);
         setPath(nextPath);
         if (!options.preserveScroll) {
-            window.scrollTo({top: 0, behavior: "smooth"});
+            const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            window.scrollTo({top: 0, behavior: reduceMotion ? "auto" : "smooth"});
         }
     }
 
@@ -54,7 +70,9 @@ export default function App() {
 
     return (
         <Shell path={path} navigate={navigate}>
-            {page}
+            <div className="page-transition" key={path}>
+                {page}
+            </div>
         </Shell>
     );
 }

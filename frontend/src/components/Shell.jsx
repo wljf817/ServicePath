@@ -11,41 +11,55 @@ export default function Shell({children, path, navigate}) {
 
     return (
         <div className="app-shell">
+            <div className="ambient-backdrop" aria-hidden="true">
+                <span className="ambient-orb ambient-orb-one" />
+                <span className="ambient-orb ambient-orb-two" />
+                <span className="ambient-grid" />
+            </div>
             <header className="topbar">
-                <button className="brand" onClick={() => navigate("/")} type="button">
-                    <span className="brand-mark"><ActivityIcon size={21} /></span>
-                    <span>
-                        <strong>ServicePath</strong>
-                        <small>Network diagnostics</small>
-                    </span>
-                </button>
+                <div className="topbar-inner">
+                    <button className="brand" onClick={() => navigate("/")} type="button">
+                        <span className="brand-mark">
+                            <ActivityIcon size={20} />
+                            <i className="brand-signal" />
+                        </span>
+                        <span>
+                            <strong>ServicePath</strong>
+                            <small>Diagnostic workspace</small>
+                        </span>
+                    </button>
 
-                <nav className="main-nav" aria-label="Primary navigation">
-                    {links.map((link) => {
-                        const LinkIcon = link.icon;
-                        const active = link.path === "/" ? path === "/" : path.startsWith(link.path);
-                        return (
-                            <Button
-                                className={active ? "nav-button nav-button-active" : "nav-button"}
-                                key={link.path}
-                                onPress={() => navigate(link.path)}
-                                size="sm"
-                                variant="ghost"
-                            >
-                                <LinkIcon size={17} />
-                                {link.label}
-                            </Button>
-                        );
-                    })}
-                </nav>
+                    <nav className="main-nav" aria-label="Primary navigation">
+                        {links.map((link) => {
+                            const LinkIcon = link.icon;
+                            const active = link.path === "/" ? path === "/" : path.startsWith(link.path);
+                            return (
+                                <Button
+                                    aria-current={active ? "page" : undefined}
+                                    className={active ? "nav-button nav-button-active" : "nav-button"}
+                                    key={link.path}
+                                    onPress={() => navigate(link.path)}
+                                    size="sm"
+                                    variant="ghost"
+                                >
+                                    <LinkIcon size={17} />
+                                    <span>{link.label}</span>
+                                </Button>
+                            );
+                        })}
+                    </nav>
 
-                <span className="system-online"><i /> System online</span>
+                    <span className="system-online"><i /> Interface ready</span>
+                </div>
             </header>
 
-            <main className="app-content">{children}</main>
+            <main className="app-content" id="main-content" tabIndex="-1">{children}</main>
 
             <footer className="app-footer">
-                <span>ServicePath</span>
+                <div>
+                    <strong>ServicePath</strong>
+                    <span>Follow the request. Find the break.</span>
+                </div>
                 <span>Flask · React · HeroUI</span>
             </footer>
         </div>
