@@ -71,7 +71,9 @@ def check_http(target, timeout=6):
                 location = response.headers.get("Location")
                 response.close()
                 if not location:
-                    raise requests.RequestException("Redirect response did not include a Location header")
+                    raise requests.RequestException(
+                        "Redirect response did not include a Location header"
+                    )
                 current_url = urljoin(current_target["url"], location)
                 redirects.append(current_url)
                 continue
