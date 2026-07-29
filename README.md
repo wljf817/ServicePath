@@ -23,6 +23,17 @@ Each check reports `Passed`, `Warning`, or `Error`. The structured results can t
 
 Python, Flask, SQLite, HTML, CSS, JavaScript, and an AI API.
 
+## Run locally
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
+```
+
+Then open `http://127.0.0.1:5050` in your browser.
+
 ## Status
 
-Early development.
+The first version of the user interface is complete. Diagnostic logic will be added next.
