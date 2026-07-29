@@ -66,6 +66,14 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Deployed Remote Server", response.data)
 
+    def test_frontend_settings_api_returns_configuration(self):
+        response = self.client.get("/api/app-settings")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["settings"]["instance_role"], "local_device")
+        self.assertIn("ai_configured", data)
+
     def test_local_request_can_update_settings(self):
         response = self.client.post(
             "/settings",
@@ -80,6 +88,20 @@ class RouteTests(unittest.TestCase):
         self.assertIn(b"Settings saved successfully", response.data)
         settings = get_settings(app.config["DATABASE"])
         self.assertEqual(settings["instance_role"], "local_device")
+
+    def test_frontend_settings_api_updates_settings(self):
+        response = self.client.post(
+            "/api/app-settings",
+            json={
+                "instance_role": "local_device",
+                "remote_service_url": "https://servicepath.example/",
+                "settings_password": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        settings = response.get_json()["settings"]
+        self.assertEqual(settings["remote_service_url"], "https://servicepath.example")
 
     @patch.dict(os.environ, {"SETTINGS_PASSWORD": "admin-secret"}, clear=True)
     def test_settings_reject_wrong_password(self):
@@ -104,6 +126,19 @@ class RouteTests(unittest.TestCase):
             },
             headers={"Host": "servicepath.example"},
             environ_base={"REMOTE_ADDR": "127.0.0.1"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    @patch.dict(os.environ, {"SETTINGS_PASSWORD": "admin-secret"}, clear=True)
+    def test_frontend_settings_api_rejects_wrong_password(self):
+        response = self.client.post(
+            "/api/app-settings",
+            json={
+                "instance_role": "remote_server",
+                "remote_service_url": "",
+                "settings_password": "wrong",
+            },
         )
 
         self.assertEqual(response.status_code, 403)
@@ -153,6 +188,20 @@ class RouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"https://example.com/", response.data)
+
+        api_response = self.client.get("/api/history")
+        self.assertEqual(api_response.status_code, 200)
+        self.assertEqual(len(api_response.get_json()["reports"]), 1)
+
+        report_id = api_response.get_json()["reports"][0]["id"]
+        report_response = self.client.get(f"/api/reports/{report_id}")
+        self.assertEqual(report_response.status_code, 200)
+        self.assertEqual(report_response.get_json()["target"]["url"], "https://example.com/")
+
+    def test_frontend_report_api_returns_not_found(self):
+        response = self.client.get("/api/reports/999")
+
+        self.assertEqual(response.status_code, 404)
 
     @patch("app.run_selected_diagnostics")
     @patch("app.analyze_report")

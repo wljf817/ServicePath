@@ -78,24 +78,35 @@ def history():
     return render_template("history.html", reports=reports)
 
 
+def settings_authorized(supplied_password):
+    expected_password = os.getenv("SETTINGS_PASSWORD", "")
+    is_loopback_address = request.remote_addr in {"127.0.0.1", "::1"}
+    is_local_host = request.host.startswith(("127.0.0.1", "localhost", "[::1]"))
+    is_local_request = is_loopback_address and is_local_host
+
+    if expected_password:
+        return hmac.compare_digest(supplied_password, expected_password)
+    return is_local_request
+
+
+def app_settings_payload():
+    return {
+        "settings": get_settings(app.config["DATABASE"]),
+        "password_required": bool(os.getenv("SETTINGS_PASSWORD")),
+        "api_token_configured": bool(os.getenv("SERVICEPATH_API_TOKEN")),
+        "ai_configured": bool(os.getenv("OPENAI_API_KEY")),
+    }
+
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings_page():
     current_settings = get_settings(app.config["DATABASE"])
     error = None
 
     if request.method == "POST":
-        expected_password = os.getenv("SETTINGS_PASSWORD", "")
         supplied_password = request.form.get("settings_password", "")
-        is_loopback_address = request.remote_addr in {"127.0.0.1", "::1"}
-        is_local_host = request.host.startswith(("127.0.0.1", "localhost", "[::1]"))
-        is_local_request = is_loopback_address and is_local_host
 
-        if expected_password:
-            authorized = hmac.compare_digest(supplied_password, expected_password)
-        else:
-            authorized = is_local_request
-
-        if not authorized:
+        if not settings_authorized(supplied_password):
             error = "A valid settings password is required."
         else:
             try:
@@ -124,6 +135,43 @@ def settings_page():
         ),
         403 if error == "A valid settings password is required." else 200,
     )
+
+
+@app.route("/api/app-settings", methods=["GET", "POST"])
+def api_app_settings():
+    if request.method == "GET":
+        return jsonify(app_settings_payload())
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "The request body must be a JSON object."}), 400
+
+    if not settings_authorized(str(data.get("settings_password", ""))):
+        return jsonify({"error": "A valid settings password is required."}), 403
+
+    try:
+        values = validate_settings(
+            str(data.get("instance_role", "")),
+            str(data.get("remote_service_url", "")),
+        )
+    except SettingsError as error:
+        return jsonify({"error": str(error)}), 400
+
+    update_settings(app.config["DATABASE"], values)
+    return jsonify(app_settings_payload())
+
+
+@app.route("/api/history")
+def api_history():
+    return jsonify({"reports": list_reports(app.config["DATABASE"])})
+
+
+@app.route("/api/reports/<int:report_id>")
+def api_report(report_id):
+    report = get_report(app.config["DATABASE"], report_id)
+    if not report:
+        return jsonify({"error": "Report not found."}), 404
+    return jsonify(report)
 
 
 @app.route("/reports/<int:report_id>")
