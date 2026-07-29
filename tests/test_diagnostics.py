@@ -22,7 +22,8 @@ class DiagnosticRunnerTests(unittest.TestCase):
     @patch("diagnostics.runner.check_tcp")
     @patch("diagnostics.runner.check_dns")
     @patch("diagnostics.runner.check_client_network")
-    def test_runs_all_five_layers(self, network, dns, tcp, tls, http):
+    @patch("diagnostics.runner.check_traceroute")
+    def test_runs_all_five_layers(self, traceroute, network, dns, tcp, tls, http):
         network.return_value = result("client")
         dns.return_value = result("dns", details={"addresses": ["93.184.216.34"]})
         tcp.return_value = result(
@@ -31,12 +32,19 @@ class DiagnosticRunnerTests(unittest.TestCase):
         )
         tls.return_value = result("tls")
         http.return_value = result("http")
+        traceroute.return_value = make_result(
+            "traceroute",
+            "Traceroute",
+            "passed",
+            "Trace passed",
+        )
 
         report = run_diagnostics("example.com")
 
         self.assertEqual(len(report["layers"]), 5)
         self.assertEqual(report["status"], "passed")
         self.assertIsNone(report["first_problem"])
+        self.assertEqual(report["traceroute"]["status"], "passed")
 
     @patch("diagnostics.runner.check_dns")
     @patch("diagnostics.runner.check_client_network")
@@ -51,13 +59,23 @@ class DiagnosticRunnerTests(unittest.TestCase):
             [layer["status"] for layer in report["layers"]],
             ["passed", "error", "skipped", "skipped", "skipped"],
         )
+        self.assertEqual(report["traceroute"]["status"], "skipped")
 
     @patch("diagnostics.runner.check_http")
     @patch("diagnostics.runner.check_tls")
     @patch("diagnostics.runner.check_tcp")
     @patch("diagnostics.runner.check_dns")
     @patch("diagnostics.runner.check_client_network")
-    def test_reports_first_warning_when_no_errors(self, network, dns, tcp, tls, http):
+    @patch("diagnostics.runner.check_traceroute")
+    def test_reports_first_warning_when_no_errors(
+        self,
+        traceroute,
+        network,
+        dns,
+        tcp,
+        tls,
+        http,
+    ):
         network.return_value = result("client", "warning")
         dns.return_value = result("dns", details={"addresses": ["93.184.216.34"]})
         tcp.return_value = result(
@@ -66,6 +84,12 @@ class DiagnosticRunnerTests(unittest.TestCase):
         )
         tls.return_value = result("tls")
         http.return_value = result("http")
+        traceroute.return_value = make_result(
+            "traceroute",
+            "Traceroute",
+            "passed",
+            "Trace passed",
+        )
 
         report = run_diagnostics("example.com")
 

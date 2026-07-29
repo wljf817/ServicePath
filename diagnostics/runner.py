@@ -8,6 +8,7 @@ from diagnostics.result import skipped_result
 from diagnostics.target import normalize_target
 from diagnostics.tcp import check_tcp
 from diagnostics.tls import check_tls
+from diagnostics.traceroute import check_traceroute, skipped_traceroute
 
 
 def _overall_status(layers):
@@ -42,6 +43,7 @@ def run_diagnostics(value, mode="local"):
     layers.append(dns_result)
 
     if dns_result["status"] == "error":
+        traceroute_result = skipped_traceroute("Skipped because DNS failed.")
         layers.extend(
             [
                 skipped_result("tcp", "TCP", "Skipped because DNS failed."),
@@ -50,6 +52,9 @@ def run_diagnostics(value, mode="local"):
             ]
         )
     elif dns_result.get("proxy_fake_ip"):
+        traceroute_result = skipped_traceroute(
+            "Skipped because proxy DNS returned a synthetic IP address."
+        )
         layers.extend(
             [
                 skipped_result(
@@ -71,6 +76,7 @@ def run_diagnostics(value, mode="local"):
         )
     else:
         addresses = dns_result["details"]["addresses"]
+        traceroute_result = check_traceroute(addresses)
         tcp_result = check_tcp(target, addresses)
         layers.append(tcp_result)
 
@@ -100,4 +106,5 @@ def run_diagnostics(value, mode="local"):
         "status": _overall_status(layers),
         "first_problem": _first_problem(layers),
         "layers": layers,
+        "traceroute": traceroute_result,
     }
