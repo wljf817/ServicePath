@@ -1,7 +1,10 @@
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from app import app
+from database import init_db
 from diagnostics.result import make_result
 
 
@@ -21,8 +24,14 @@ def sample_report():
 
 class RouteTests(unittest.TestCase):
     def setUp(self):
+        self.temporary_directory = tempfile.TemporaryDirectory()
         app.config["TESTING"] = True
+        app.config["DATABASE"] = str(Path(self.temporary_directory.name) / "test.db")
+        init_db(app.config["DATABASE"])
         self.client = app.test_client()
+
+    def tearDown(self):
+        self.temporary_directory.cleanup()
 
     def test_home_page_loads(self):
         response = self.client.get("/")
@@ -37,11 +46,25 @@ class RouteTests(unittest.TestCase):
         response = self.client.post(
             "/diagnose",
             data={"domain": "example.com", "mode": "local"},
+            follow_redirects=True,
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"DNS passed", response.data)
         run_diagnostics.assert_called_once_with("example.com", mode="local")
+
+    @patch("app.run_diagnostics")
+    def test_saved_report_appears_in_history(self, run_diagnostics):
+        run_diagnostics.return_value = sample_report()
+        self.client.post(
+            "/diagnose",
+            data={"domain": "example.com", "mode": "local"},
+        )
+
+        response = self.client.get("/history")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"https://example.com/", response.data)
 
     def test_remote_mode_is_not_configured_yet(self):
         response = self.client.post(

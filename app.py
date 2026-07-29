@@ -1,10 +1,13 @@
-from flask import Flask, render_template, request
+from flask import Flask, abort, redirect, render_template, request, url_for
 
+from database import get_report, init_db, list_reports, save_report
 from diagnostics.runner import run_diagnostics
 from diagnostics.target import TargetError
 
 
 app = Flask(__name__)
+app.config["DATABASE"] = f"{app.instance_path}/servicepath.db"
+init_db(app.config["DATABASE"])
 
 
 @app.template_filter("format_detail")
@@ -21,6 +24,25 @@ def format_detail(value):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/history")
+def history():
+    reports = list_reports(app.config["DATABASE"])
+    return render_template("history.html", reports=reports)
+
+
+@app.route("/reports/<int:report_id>")
+def view_report(report_id):
+    report = get_report(app.config["DATABASE"], report_id)
+    if not report:
+        abort(404)
+    return render_template(
+        "index.html",
+        report=report,
+        domain=report["target"]["url"],
+        mode=report["mode"],
+    )
 
 
 @app.route("/diagnose", methods=["POST"])
@@ -52,12 +74,8 @@ def diagnose():
             400,
         )
 
-    return render_template(
-        "index.html",
-        domain=domain,
-        mode=mode,
-        report=report,
-    )
+    report_id = save_report(app.config["DATABASE"], report)
+    return redirect(url_for("view_report", report_id=report_id))
 
 
 if __name__ == "__main__":

@@ -40,9 +40,20 @@ body {
     font-size: 13px;
 }
 
-.header-label {
-    color: #6e7b85;
+.site-header nav {
+    display: flex;
+    gap: 18px;
+}
+
+.site-header nav a {
+    color: #5f6c76;
     font-size: 14px;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.site-header nav a:hover {
+    color: #0b7a75;
 }
 
 .page {
@@ -384,11 +395,86 @@ footer {
     font-size: 13px;
 }
 
-@media (max-width: 760px) {
-    .header-label {
-        display: none;
-    }
+.history-page {
+    max-width: 900px;
+}
 
+.history-list {
+    display: grid;
+    gap: 12px;
+}
+
+.history-item,
+.empty-card {
+    background: #ffffff;
+    border: 1px solid #dce3e8;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(33, 54, 71, 0.05);
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 20px 22px;
+    color: #17222d;
+    text-decoration: none;
+}
+
+.history-item:hover {
+    border-color: #0b7a75;
+}
+
+.history-item p {
+    margin: 6px 0 0;
+    color: #73808a;
+    font-size: 13px;
+}
+
+.history-status {
+    padding: 6px 10px;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.history-status.status-passed {
+    background: #e7f7ef;
+    color: #167a52;
+}
+
+.history-status.status-warning {
+    background: #fff5d9;
+    color: #8a6400;
+}
+
+.history-status.status-error {
+    background: #fdebed;
+    color: #b32838;
+}
+
+.empty-card {
+    padding: 34px;
+    text-align: center;
+}
+
+.empty-card p {
+    margin: 10px 0 24px;
+    color: #6e7b85;
+}
+
+.button-link {
+    display: inline-block;
+    padding: 12px 18px;
+    border-radius: 8px;
+    background: #0b7a75;
+    color: #ffffff;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+@media (max-width: 760px) {
     .page {
         padding-top: 42px;
     }
