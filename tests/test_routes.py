@@ -40,8 +40,16 @@ class RouteTests(unittest.TestCase):
         self.assertIn(b"Start diagnosis", response.data)
 
     @patch("app.run_diagnostics")
-    def test_local_diagnosis_displays_report(self, run_diagnostics):
+    @patch("app.analyze_report")
+    def test_local_diagnosis_displays_report(self, analyze_report, run_diagnostics):
         run_diagnostics.return_value = sample_report()
+        analyze_report.return_value = {
+            "source": "rules",
+            "title": "No failure was detected",
+            "explanation": "All checks passed.",
+            "causes": [],
+            "actions": ["No action needed."],
+        }
 
         response = self.client.post(
             "/diagnose",
@@ -51,11 +59,14 @@ class RouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"DNS passed", response.data)
+        self.assertIn(b"No failure was detected", response.data)
         run_diagnostics.assert_called_once_with("example.com", mode="local")
 
     @patch("app.run_diagnostics")
-    def test_saved_report_appears_in_history(self, run_diagnostics):
+    @patch("app.analyze_report")
+    def test_saved_report_appears_in_history(self, analyze_report, run_diagnostics):
         run_diagnostics.return_value = sample_report()
+        analyze_report.return_value = {"source": "rules", "title": "Test", "actions": []}
         self.client.post(
             "/diagnose",
             data={"domain": "example.com", "mode": "local"},

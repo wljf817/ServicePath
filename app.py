@@ -1,9 +1,13 @@
 from flask import Flask, abort, redirect, render_template, request, url_for
+from dotenv import load_dotenv
 
 from database import get_report, init_db, list_reports, save_report
+from diagnostics.analysis import analyze_report
 from diagnostics.runner import run_diagnostics
 from diagnostics.target import TargetError
 
+
+load_dotenv()
 
 app = Flask(__name__)
 app.config["DATABASE"] = f"{app.instance_path}/servicepath.db"
@@ -74,6 +78,7 @@ def diagnose():
             400,
         )
 
+    report["analysis"] = analyze_report(report)
     report_id = save_report(app.config["DATABASE"], report)
     return redirect(url_for("view_report", report_id=report_id))
 
