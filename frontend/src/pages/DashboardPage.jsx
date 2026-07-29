@@ -130,8 +130,11 @@ export default function DashboardPage({appSettings, navigate}) {
                                                 <strong>{item.title}</strong>
                                                 <small>{item.description}</small>
                                             </span>
-                                            <span className="mode-radio"><i /></span>
-                                            {disabled && <em>Unavailable here</em>}
+                                            {disabled ? (
+                                                <span className="mode-unavailable">Unavailable</span>
+                                            ) : (
+                                                <span className="mode-radio"><i /></span>
+                                            )}
                                         </label>
                                     );
                                 })}

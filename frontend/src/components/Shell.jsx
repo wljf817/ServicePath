@@ -24,7 +24,6 @@ export default function Shell({children, path, navigate}) {
                         </span>
                         <span className="brand-copy">
                             <strong>ServicePath</strong>
-                            <small>Diagnostic workspace</small>
                         </span>
                     </button>
 
@@ -59,7 +58,6 @@ export default function Shell({children, path, navigate}) {
                     <span className="footer-mark"><LogoMark size={18} /></span>
                     <span className="footer-copy">
                         <strong>ServicePath</strong>
-                        <small>Follow the request. Find the break.</small>
                     </span>
                 </div>
                 <div className="footer-meta" aria-label="Application details">
