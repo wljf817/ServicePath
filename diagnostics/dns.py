@@ -22,6 +22,7 @@ def check_dns(target):
         status = "passed"
         summary = f"Resolved {len(addresses)} public IP address(es)."
         details = {
+            "Hostname": target["hostname"],
             "A records": ipv4,
             "AAAA records": ipv6,
             "addresses": addresses,
@@ -29,7 +30,13 @@ def check_dns(target):
     except (socket.gaierror, TargetError) as error:
         status = "error"
         summary = f"DNS lookup failed: {error}"
-        details = {"A records": [], "AAAA records": [], "addresses": []}
+        details = {
+            "Hostname": target["hostname"],
+            "A records": [],
+            "AAAA records": [],
+            "addresses": [],
+            "Error": str(error),
+        }
 
     duration = round((perf_counter() - started) * 1000)
     return make_result("dns", "DNS", status, summary, duration, details)

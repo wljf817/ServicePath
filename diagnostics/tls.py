@@ -19,6 +19,11 @@ def check_tls(target, addresses, tcp_result, timeout=4):
             "TLS",
             "skipped",
             f"TLS check skipped because TCP port {port} is unavailable.",
+            details={
+                "Port": port,
+                "SNI hostname": target["hostname"],
+                "TCP status": "Unavailable",
+            },
         )
 
     context = ssl.create_default_context(cafile=certifi.where())
@@ -41,6 +46,11 @@ def check_tls(target, addresses, tcp_result, timeout=4):
             cipher = secure_socket.cipher()
             duration = round((perf_counter() - started) * 1000)
             details = {
+                "Port": port,
+                "Connected address": address,
+                "SNI hostname": target["hostname"],
+                "Certificate trusted": "Yes",
+                "Hostname matches": "Yes",
                 "TLS version": secure_socket.version(),
                 "Cipher": cipher[0] if cipher else "Unknown",
                 "Certificate expires": expires_at.isoformat(),
@@ -80,4 +90,12 @@ def check_tls(target, addresses, tcp_result, timeout=4):
         "error",
         f"TLS handshake failed: {last_error}",
         duration,
+        {
+            "Port": port,
+            "SNI hostname": target["hostname"],
+            "TLS handshake": "Failed",
+            "Certificate trusted": "Not confirmed",
+            "Hostname matches": "Not confirmed",
+            "Error": last_error,
+        },
     )

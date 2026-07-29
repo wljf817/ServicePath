@@ -279,12 +279,32 @@ fieldset {
     margin-bottom: 8px;
 }
 
+.console-step {
+    margin-top: 18px;
+    font-weight: bold;
+}
+
+.console-detail {
+    padding-left: 18px;
+    overflow-wrap: anywhere;
+}
+
+.console-done {
+    margin-top: 20px;
+    padding-top: 12px;
+    border-top: 1px solid #33434f;
+}
+
 .ready {
     color: #53d39e;
 }
 
 .info {
     color: #69bde7;
+}
+
+.return {
+    color: #b8a7f2;
 }
 
 .error {

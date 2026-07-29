@@ -111,7 +111,12 @@ class RouteTests(unittest.TestCase):
     @patch("app.run_selected_diagnostics")
     @patch("app.analyze_report")
     def test_local_diagnosis_displays_report(self, analyze_report, run_selected):
-        run_selected.return_value = sample_report()
+        test_report = sample_report()
+        test_report["layers"][1]["details"] = {
+            "A records": ["93.184.216.34"],
+            "Lookup": {"Resolver": "System resolver"},
+        }
+        run_selected.return_value = test_report
         analyze_report.return_value = unconfigured_analysis()
 
         response = self.client.post(
@@ -123,6 +128,9 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"DNS passed", response.data)
         self.assertIn(b"AI analysis is not configured", response.data)
+        self.assertIn(b"[RETURN]", response.data)
+        self.assertIn(b"93.184.216.34", response.data)
+        self.assertIn(b"System resolver", response.data)
         run_selected.assert_called_once_with(
             "example.com",
             "local",

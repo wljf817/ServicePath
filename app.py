@@ -39,6 +39,26 @@ def format_detail(value):
     return str(value)
 
 
+@app.template_filter("console_details")
+def console_details(details):
+    """Flatten nested diagnostic details into readable console lines."""
+    lines = []
+
+    def add_value(label, value):
+        if isinstance(value, dict):
+            if not value:
+                lines.append({"label": label, "value": "None"})
+            for child_label, child_value in value.items():
+                add_value(f"{label} > {child_label}", child_value)
+        else:
+            lines.append({"label": label, "value": format_detail(value)})
+
+    for label, value in details.items():
+        add_value(label, value)
+
+    return lines
+
+
 @app.route("/")
 def index():
     current_settings = get_settings(app.config["DATABASE"])

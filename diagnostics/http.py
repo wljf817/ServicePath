@@ -85,6 +85,7 @@ def check_http(target, timeout=6):
             response.close()
 
             details = {
+                "Requested URL": target["url"],
                 "Status code": status_code,
                 "Final URL": final_url,
                 "Redirects": redirects,
@@ -115,6 +116,11 @@ def check_http(target, timeout=6):
             "error",
             f"HTTP request failed: {error}",
             duration,
+            {
+                "Requested URL": target["url"],
+                "Last URL": current_url,
+                "Error": str(error),
+            },
         )
     finally:
         session.close()

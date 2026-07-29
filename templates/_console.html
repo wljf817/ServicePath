@@ -1,0 +1,31 @@
+{% macro render_console(test_report, show_header=True) %}
+    {% if show_header %}
+        <p><span class="info">[INFO]</span> Target: {{ test_report.target.url }}</p>
+        <p><span class="info">[INFO]</span> Mode: {{ test_report.mode|title }} Test</p>
+    {% endif %}
+
+    {% for layer in test_report.layers %}
+        <p class="console-step">
+            <span class="info">[CHECK]</span> {{ layer.name }}
+        </p>
+        <p class="console-detail">
+            <span class="{{ layer.status }}">[{{ layer.status|upper }}]</span>
+            {{ layer.summary }}
+        </p>
+        <p class="console-detail">
+            <span class="info">[TIME]</span> {{ layer.duration_ms }} ms
+        </p>
+        {% for detail in layer.details|console_details %}
+            <p class="console-detail">
+                <span class="return">[RETURN]</span>
+                {{ detail.label }}: {{ detail.value }}
+            </p>
+        {% endfor %}
+    {% endfor %}
+
+    <p class="console-done">
+        <span class="info">[DONE]</span>
+        Finished in {{ test_report.duration_ms }} ms.
+        Overall status: {{ test_report.status|upper }}.
+    </p>
+{% endmacro %}

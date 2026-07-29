@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    {% from '_console.html' import render_console %}
     <header class="site-header">
         <a class="brand" href="{{ url_for('index') }}">
             <span class="brand-mark">SP</span>
@@ -42,16 +43,7 @@
                         <span class="console-dot"></span>
                     </div>
                     <div class="console compare-console">
-                        {% for layer in test_report.layers %}
-                            <p>
-                                <span class="{{ layer.status }}">[{{ layer.status|upper }}]</span>
-                                {{ layer.name }} — {{ layer.summary }}
-                            </p>
-                        {% endfor %}
-                        <p>
-                            <span class="info">[DONE]</span>
-                            {{ test_report.duration_ms }} ms · {{ test_report.status|upper }}
-                        </p>
+                        {{ render_console(test_report) }}
                     </div>
                 </div>
             {% endfor %}

@@ -8,6 +8,7 @@
     <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
+    {% from '_console.html' import render_console %}
     <header class="site-header">
         <a class="brand" href="{{ url_for('index') }}">
             <span class="brand-mark">SP</span>
@@ -125,19 +126,7 @@
                 <div class="console">
                     <div id="console-output">
                     {% if report %}
-                        <p><span class="info">[INFO]</span> Target: {{ report.target.url }}</p>
-                        <p><span class="info">[INFO]</span> Mode: {{ report.mode|title }} Test</p>
-                        {% for layer in report.layers %}
-                            <p>
-                                <span class="{{ layer.status }}">[{{ layer.status|upper }}]</span>
-                                {{ layer.name }} — {{ layer.summary }}
-                                {% if layer.duration_ms %}({{ layer.duration_ms }} ms){% endif %}
-                            </p>
-                        {% endfor %}
-                        <p>
-                            <span class="info">[DONE]</span>
-                            Finished in {{ report.duration_ms }} ms. Overall status: {{ report.status|upper }}.
-                        </p>
+                        {{ render_console(report) }}
                     {% elif error %}
                         <p><span class="error">[ERROR]</span> {{ error }}</p>
                     {% else %}
