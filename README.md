@@ -8,7 +8,9 @@ ServicePath is a Flask website diagnostic tool with a React and HeroUI frontend.
 4. TLS handshake, certificate trust, expiration, and hostname match
 5. HTTP status, redirects, response time, page title, and basic CDN/WAF headers
 
-Every layer reports **Passed**, **Warning**, **Error**, or **Skipped**. The console expands each layer into its timing and returned sub-check values. ServicePath identifies the first problem layer. An OpenAI API key enables AI-generated analysis; without a key, the report lists detected warnings and errors without generating advice.
+ServicePath also runs a supplemental Traceroute between DNS and TCP. It records up to eight hops, the executed command, return code, timing, and raw output without changing the five-layer fault classification.
+
+Every check reports **Passed**, **Warning**, **Error**, or **Skipped**. The console expands each check into its timing and returned sub-check values. ServicePath identifies the first problem layer. An OpenAI API key enables AI-generated analysis; without a key, the report lists detected warnings and errors without generating advice.
 
 The interface has three modes:
 
@@ -116,6 +118,7 @@ The local instance calls `POST /api/diagnose` on the deployed server. Compare Bo
 ## Known limitations
 
 - Console lines appear when the request finishes; they are not streamed live.
+- Traceroute requires the system `traceroute` command on macOS/Linux or `tracert` on Windows. It is skipped when unavailable, after DNS failure, or when proxy DNS returns a synthetic Fake-IP.
 - Compare Both runs Local Test and Remote Test one after the other, so it takes longer than either individual mode.
 - A deployed webpage cannot perform raw DNS, TCP, or TLS checks from a visitor's device. Local Test and Compare Both therefore require the user to start the local Flask instance.
 - When the machine running a test has a system proxy, ServicePath recognizes Fake-IP DNS in `198.18.0.0/15`. It skips misleading raw TCP/TLS checks and runs HTTP through that proxy.
