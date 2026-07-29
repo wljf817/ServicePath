@@ -2,176 +2,30 @@ import json
 import os
 
 
-GUIDANCE = {
-    "client": {
-        "title": "Check the local network environment",
-        "explanation": "The first warning or failure appeared in the client network layer.",
-        "causes": [
-            "No usable network route",
-            "IPv6 is unavailable",
-            "Proxy settings changed the route",
-        ],
-        "actions": [
-            "Confirm the device is online",
-            "Temporarily disable the proxy or VPN",
-            "Try another network",
-        ],
-    },
-    "dns": {
-        "title": "Investigate DNS resolution",
-        "explanation": "The domain could not be resolved to a safe public IP address.",
-        "causes": [
-            "The domain does not exist",
-            "The DNS server is unavailable",
-            "The domain points to a private address",
-        ],
-        "actions": [
-            "Check the spelling of the domain",
-            "Try a trusted public DNS resolver",
-            "Review the domain's DNS records",
-        ],
-    },
-    "tcp": {
-        "title": "Check ports and network access",
-        "explanation": "DNS worked, but the tested web ports did not accept a TCP connection.",
-        "causes": [
-            "The web server is offline",
-            "A firewall blocks port 80 or 443",
-            "The service listens on another port",
-        ],
-        "actions": [
-            "Confirm the web server is running",
-            "Review firewall and security-group rules",
-            "Verify the configured web port",
-        ],
-    },
-    "tls": {
-        "title": "Review HTTPS and certificate settings",
-        "explanation": (
-            "The network connection worked, but the secure TLS handshake did not "
-            "complete normally."
-        ),
-        "causes": [
-            "The certificate is expired or untrusted",
-            "The certificate does not match the domain",
-            "The server has an incorrect SNI or TLS configuration",
-        ],
-        "actions": [
-            "Renew and install the full certificate chain",
-            "Confirm the certificate includes this domain",
-            "Review the server's TLS and SNI settings",
-        ],
-    },
-    "http": {
-        "title": "Investigate the website application",
-        "explanation": (
-            "The lower network layers worked, but the website returned an HTTP "
-            "warning or server error."
-        ),
-        "causes": [
-            "The application returned an error",
-            "A reverse proxy or CDN cannot reach its origin",
-            "Access is denied or the page is missing",
-        ],
-        "actions": [
-            "Review the HTTP status and server logs",
-            "Check the application and upstream services",
-            "Verify CDN or reverse-proxy configuration",
-        ],
-    },
-}
-
-
-def comparison_analysis(report):
-    comparison = report["comparison"]
-    classification = comparison["classification"]
-    local_problem = comparison.get("local_problem")
-    remote_problem = comparison.get("remote_problem")
-
-    if classification == "no_issue":
-        return {
-            "source": "rules",
-            "title": comparison["title"],
-            "explanation": comparison["summary"],
-            "causes": [],
-            "actions": [
-                "No repair is required based on these two tests.",
-                "Repeat Compare Both if the problem returns intermittently.",
-            ],
-        }
-
-    if classification == "local_only":
-        guidance = GUIDANCE.get(local_problem, GUIDANCE["client"])
-        actions = list(guidance["actions"])
-        actions.append("Compare local DNS, proxy, VPN, and firewall settings.")
-        return {
-            "source": "rules",
-            "title": comparison["title"],
-            "explanation": comparison["summary"],
-            "causes": list(guidance["causes"]),
-            "actions": actions,
-        }
-
-    if classification == "remote_only":
-        guidance = GUIDANCE.get(remote_problem, GUIDANCE["client"])
-        return {
-            "source": "rules",
-            "title": comparison["title"],
-            "explanation": comparison["summary"],
-            "causes": [
-                "The remote server has a regional routing or DNS difference",
-                "The target blocks the remote server's IP or region",
-            ],
-            "actions": list(guidance["actions"]),
-        }
-
-    if classification == "shared_problem":
-        guidance = GUIDANCE.get(local_problem, GUIDANCE["http"])
-        return {
-            "source": "rules",
-            "title": comparison["title"],
-            "explanation": comparison["summary"],
-            "causes": list(guidance["causes"]),
-            "actions": list(guidance["actions"]),
-        }
-
-    return {
-        "source": "rules",
-        "title": comparison["title"],
-        "explanation": comparison["summary"],
-        "causes": [
-            "The two networks use different DNS, routes, or address families",
-            "The website applies different rules by IP address or region",
-        ],
-        "actions": [
-            "Review each test's first problem layer separately.",
-            "Compare DNS answers, proxies, and firewall rules between locations.",
-            "Repeat both tests to rule out an intermittent failure.",
-        ],
-    }
-
-
-def rule_based_analysis(report):
+def collect_issues(report):
+    """Return every warning and error without trying to explain it."""
     if report.get("mode") == "compare":
-        return comparison_analysis(report)
+        reports = [
+            ("Local Test", report["local_report"]),
+            ("Remote Test", report["remote_report"]),
+        ]
+    else:
+        reports = [(None, report)]
 
-    problem = report.get("first_problem")
-
-    if not problem:
-        return {
-            "source": "rules",
-            "title": "No failure was detected",
-            "explanation": "All five diagnostic layers passed from this test location.",
-            "causes": [],
-            "actions": [
-                "No repair is required based on this test.",
-                "If the problem is intermittent, run another test when it happens.",
-            ],
-        }
-
-    guidance = GUIDANCE[problem].copy()
-    guidance["source"] = "rules"
-    return guidance
+    issues = []
+    for location, test_report in reports:
+        for layer in test_report.get("layers", []):
+            if layer["status"] not in {"warning", "error"}:
+                continue
+            issues.append(
+                {
+                    "location": location,
+                    "layer": layer["name"],
+                    "status": layer["status"],
+                    "summary": layer["summary"],
+                }
+            )
+    return issues
 
 
 def request_openai_analysis(report):
@@ -196,15 +50,20 @@ def request_openai_analysis(report):
 
 
 def analyze_report(report):
-    fallback = rule_based_analysis(report)
+    issues = collect_issues(report)
 
     if not os.getenv("OPENAI_API_KEY"):
-        return fallback
+        return {
+            "source": "not_configured",
+            "message": "AI analysis is not configured.",
+            "issues": issues,
+        }
 
     try:
         return request_openai_analysis(report)
     except Exception:
-        fallback["note"] = (
-            "AI analysis was unavailable, so rule-based guidance was used instead."
-        )
-        return fallback
+        return {
+            "source": "unavailable",
+            "message": "AI analysis could not be generated.",
+            "issues": issues,
+        }

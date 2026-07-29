@@ -31,6 +31,14 @@ def sample_report():
     }
 
 
+def unconfigured_analysis():
+    return {
+        "source": "not_configured",
+        "message": "AI analysis is not configured.",
+        "issues": [],
+    }
+
+
 class RouteTests(unittest.TestCase):
     def setUp(self):
         self.temporary_directory = tempfile.TemporaryDirectory()
@@ -104,13 +112,7 @@ class RouteTests(unittest.TestCase):
     @patch("app.analyze_report")
     def test_local_diagnosis_displays_report(self, analyze_report, run_selected):
         run_selected.return_value = sample_report()
-        analyze_report.return_value = {
-            "source": "rules",
-            "title": "No failure was detected",
-            "explanation": "All checks passed.",
-            "causes": [],
-            "actions": ["No action needed."],
-        }
+        analyze_report.return_value = unconfigured_analysis()
 
         response = self.client.post(
             "/diagnose",
@@ -120,7 +122,7 @@ class RouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"DNS passed", response.data)
-        self.assertIn(b"No failure was detected", response.data)
+        self.assertIn(b"AI analysis is not configured", response.data)
         run_selected.assert_called_once_with(
             "example.com",
             "local",
@@ -131,7 +133,7 @@ class RouteTests(unittest.TestCase):
     @patch("app.analyze_report")
     def test_saved_report_appears_in_history(self, analyze_report, run_selected):
         run_selected.return_value = sample_report()
-        analyze_report.return_value = {"source": "rules", "title": "Test", "actions": []}
+        analyze_report.return_value = unconfigured_analysis()
         self.client.post(
             "/diagnose",
             data={"domain": "example.com", "mode": "local"},
@@ -158,13 +160,7 @@ class RouteTests(unittest.TestCase):
         remote_report = sample_report()
         remote_report["mode"] = "remote"
         run_selected.return_value = remote_report
-        analyze_report.return_value = {
-            "source": "rules",
-            "title": "No failure was detected",
-            "explanation": "All checks passed.",
-            "causes": [],
-            "actions": [],
-        }
+        analyze_report.return_value = unconfigured_analysis()
 
         response = self.client.post(
             "/diagnose",
@@ -193,13 +189,7 @@ class RouteTests(unittest.TestCase):
         remote_report = sample_report()
         remote_report["mode"] = "remote"
         run_selected.return_value = compare_reports(local_report, remote_report)
-        analyze_report.return_value = {
-            "source": "rules",
-            "title": "No problem detected from either location",
-            "explanation": "Both tests passed.",
-            "causes": [],
-            "actions": [],
-        }
+        analyze_report.return_value = unconfigured_analysis()
 
         response = self.client.post(
             "/diagnose",
@@ -209,7 +199,7 @@ class RouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Layer comparison", response.data)
-        self.assertIn(b"No problem detected from either location", response.data)
+        self.assertIn(b"AI analysis is not configured", response.data)
         run_selected.assert_called_once_with(
             "example.com",
             "compare",
@@ -226,13 +216,7 @@ class RouteTests(unittest.TestCase):
         remote_report = sample_report()
         remote_report["mode"] = "remote"
         run_selected.return_value = remote_report
-        analyze_report.return_value = {
-            "source": "rules",
-            "title": "Test",
-            "explanation": "Test",
-            "causes": [],
-            "actions": [],
-        }
+        analyze_report.return_value = unconfigured_analysis()
 
         response = self.client.post(
             "/diagnose",

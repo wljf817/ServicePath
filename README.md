@@ -8,7 +8,7 @@ ServicePath is a Flask website diagnostic tool. Enter a domain or HTTP(S) URL an
 4. TLS handshake, certificate trust, expiration, and hostname match
 5. HTTP status, redirects, response time, page title, and basic CDN/WAF headers
 
-Every layer reports **Passed**, **Warning**, **Error**, or **Skipped**. ServicePath identifies the first problem layer and produces repair guidance. An OpenAI API key enables AI-generated analysis; without a key, the app uses built-in rule-based guidance.
+Every layer reports **Passed**, **Warning**, **Error**, or **Skipped**. ServicePath identifies the first problem layer. An OpenAI API key enables AI-generated analysis; without a key, the report lists detected warnings and errors without generating advice.
 
 The interface has three modes:
 
@@ -57,7 +57,7 @@ OPENAI_API_KEY=your_key_here
 OPENAI_MODEL=gpt-5.6
 ```
 
-Keys are read from the environment and `.env` is ignored by Git. The integration uses the OpenAI Responses API. If the API is unavailable, diagnostics still complete with rule-based guidance.
+Keys are read from the environment and `.env` is ignored by Git. The integration uses the OpenAI Responses API. If the API is unavailable, diagnostics still complete, but no analysis or repair advice is generated.
 
 ## Settings and execution location
 

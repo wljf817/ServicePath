@@ -1,39 +1,43 @@
 <section class="ai-card">
     <div class="ai-icon">AI</div>
     <div class="analysis-content">
-        <p class="eyebrow">AI ANALYSIS</p>
-        {% if report and report.analysis %}
-            {% if report.analysis.source == 'openai' %}
-                <h2>AI explanation and recommended actions</h2>
-                <p class="analysis-source">Generated with {{ report.analysis.model }}</p>
-                <div class="analysis-text">{{ report.analysis.text }}</div>
+        {% if report and report.analysis and report.analysis.source == 'openai' %}
+            <p class="eyebrow">AI ANALYSIS</p>
+            <h2>AI explanation and recommended actions</h2>
+            <p class="analysis-source">Generated with {{ report.analysis.model }}</p>
+            <div class="analysis-text">{{ report.analysis.text }}</div>
+        {% elif report and report.analysis %}
+            <p class="eyebrow">ANALYSIS STATUS</p>
+            <h2>{{ report.analysis.message }}</h2>
+            {% if report.analysis.source == 'not_configured' %}
+                <p>
+                    Add <code>OPENAI_API_KEY</code> to the server's
+                    <code>.env</code> file to enable it.
+                </p>
             {% else %}
-                <h2>{{ report.analysis.title }}</h2>
-                <p>{{ report.analysis.explanation }}</p>
+                <p>Check the API configuration and try another diagnosis.</p>
+            {% endif %}
 
-                {% if report.analysis.causes %}
-                    <h3>Possible causes</h3>
-                    <ul>
-                        {% for cause in report.analysis.causes %}
-                            <li>{{ cause }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-
-                <h3>Recommended actions</h3>
-                <ol>
-                    {% for action in report.analysis.actions %}
-                        <li>{{ action }}</li>
+            <h3>Detected warnings and errors</h3>
+            {% if report.analysis.issues %}
+                <ul class="issue-list">
+                    {% for issue in report.analysis.issues %}
+                        <li>
+                            <strong class="status-{{ issue.status }}">
+                                {{ issue.status|upper }}
+                            </strong>
+                            {% if issue.location %}{{ issue.location }} · {% endif %}
+                            {{ issue.layer }} — {{ issue.summary }}
+                        </li>
                     {% endfor %}
-                </ol>
-
-                {% if report.analysis.note %}
-                    <p class="analysis-note">{{ report.analysis.note }}</p>
-                {% endif %}
+                </ul>
+            {% else %}
+                <p>No warnings or errors were detected.</p>
             {% endif %}
         {% else %}
+            <p class="eyebrow">AI ANALYSIS</p>
             <h2>Explanation and recommended actions</h2>
-            <p>Guidance will appear here after all diagnostic layers finish.</p>
+            <p>AI analysis will appear here after all diagnostic layers finish.</p>
         {% endif %}
     </div>
 </section>
