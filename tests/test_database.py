@@ -2,7 +2,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from database import get_report, init_db, list_reports, save_report
+from database import (
+    get_report,
+    get_settings,
+    init_db,
+    list_reports,
+    save_report,
+    update_settings,
+)
 
 
 def sample_report():
@@ -39,6 +46,33 @@ class DatabaseTests(unittest.TestCase):
         reports = list_reports(self.database_path)
 
         self.assertEqual([report["id"] for report in reports], [second_id, first_id])
+
+    def test_uses_remote_server_as_default_role(self):
+        settings = get_settings(self.database_path)
+
+        self.assertEqual(settings["instance_role"], "remote_server")
+        self.assertEqual(settings["remote_service_url"], "")
+
+    def test_updates_settings(self):
+        update_settings(
+            self.database_path,
+            {
+                "instance_role": "local_device",
+                "remote_service_url": "https://servicepath.example",
+            },
+        )
+
+        settings = get_settings(self.database_path)
+
+        self.assertEqual(settings["instance_role"], "local_device")
+        self.assertEqual(
+            settings["remote_service_url"],
+            "https://servicepath.example",
+        )
+
+    def test_rejects_unknown_setting(self):
+        with self.assertRaises(ValueError):
+            update_settings(self.database_path, {"api_key": "secret"})
 
 
 if __name__ == "__main__":

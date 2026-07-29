@@ -3,6 +3,12 @@ import sqlite3
 from pathlib import Path
 
 
+DEFAULT_SETTINGS = {
+    "instance_role": "remote_server",
+    "remote_service_url": "",
+}
+
+
 def connect(database_path):
     connection = sqlite3.connect(database_path)
     connection.row_factory = sqlite3.Row
@@ -23,6 +29,14 @@ def init_db(database_path):
                 first_problem TEXT,
                 created_at TEXT NOT NULL,
                 report_json TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             )
             """
         )
@@ -78,3 +92,33 @@ def list_reports(database_path, limit=50):
         ).fetchall()
 
     return [dict(row) for row in rows]
+
+
+def get_settings(database_path):
+    settings = DEFAULT_SETTINGS.copy()
+
+    with connect(database_path) as connection:
+        rows = connection.execute("SELECT key, value FROM settings").fetchall()
+
+    for row in rows:
+        if row["key"] in settings:
+            settings[row["key"]] = row["value"]
+
+    return settings
+
+
+def update_settings(database_path, values):
+    unknown_keys = set(values) - set(DEFAULT_SETTINGS)
+    if unknown_keys:
+        raise ValueError("Unknown setting: " + ", ".join(sorted(unknown_keys)))
+
+    with connect(database_path) as connection:
+        for key, value in values.items():
+            connection.execute(
+                """
+                INSERT INTO settings (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (key, str(value)),
+            )
