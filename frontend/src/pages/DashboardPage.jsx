@@ -5,6 +5,8 @@ import {startDiagnosis} from "../api";
 import DiagnosticConsole from "../components/DiagnosticConsole";
 import {ArrowIcon, GlobeIcon} from "../components/Icons";
 import LayerList from "../components/LayerList";
+import NetworkPathVisual from "../components/NetworkPathVisual";
+import ScanProgress from "../components/ScanProgress";
 
 const modes = [
     {value: "local", title: "Local Test", description: "This device and network"},
@@ -43,23 +45,22 @@ export default function DashboardPage({appSettings, navigate}) {
 
     return (
         <>
-            <section className="hero-section">
-                <div>
-                    <span className="hero-pill"><i /> Five-layer diagnostics</span>
-                    <h1>Trace the failure.<br /><span>Fix the right layer.</span></h1>
+            <section className="hero-section dashboard-hero">
+                <div className="hero-copy">
+                    <span className="hero-pill"><i /> Network observability, simplified</span>
+                    <h1>See exactly where a <span>connection breaks.</span></h1>
                     <p>
-                        Inspect client network, DNS, TCP, TLS, and HTTP from one clean
-                        diagnostic path—then send the evidence to AI when configured.
+                        Trace a request from the client to the application. ServicePath
+                        captures every return, identifies the first unhealthy layer, and
+                        prepares the evidence for AI analysis.
                     </p>
+                    <div className="hero-facts" aria-label="ServicePath capabilities">
+                        <span><strong>05</strong> diagnostic layers</span>
+                        <span><strong>RAW</strong> return data</span>
+                        <span><strong>AI</strong> guided analysis</span>
+                    </div>
                 </div>
-                <div className="hero-orbit" aria-hidden="true">
-                    <span className="orbit-ring orbit-one" />
-                    <span className="orbit-ring orbit-two" />
-                    <span className="orbit-core"><GlobeIcon size={34} /></span>
-                    <i className="orbit-node node-one" />
-                    <i className="orbit-node node-two" />
-                    <i className="orbit-node node-three" />
-                </div>
+                <NetworkPathVisual loading={loading} />
             </section>
 
             <Card className="diagnostic-card">
@@ -67,15 +68,16 @@ export default function DashboardPage({appSettings, navigate}) {
                     <form onSubmit={submit}>
                         <div className="form-heading">
                             <div>
-                                <span className="section-kicker">NEW DIAGNOSIS</span>
-                                <h2>Which website should we inspect?</h2>
+                                <span className="section-kicker">NEW TRACE</span>
+                                <h2>Start a website diagnosis</h2>
+                                <p>Enter a public website or domain. The scan runs from the selected location.</p>
                             </div>
                             <span className="role-chip">
                                 {role === "remote_server" ? "Remote server" : "Local device"}
                             </span>
                         </div>
 
-                        <label className="field-label" htmlFor="domain">Website or domain</label>
+                        <label className="field-label" htmlFor="domain">Target website</label>
                         <div className="domain-row">
                             <div className="domain-input-wrap">
                                 <GlobeIcon size={19} />
@@ -103,28 +105,40 @@ export default function DashboardPage({appSettings, navigate}) {
                             </Button>
                         </div>
 
-                        {error && <p className="form-error">{error}</p>}
+                        {error && <p className="form-error" role="alert">{error}</p>}
 
-                        <div className="mode-grid" role="radiogroup" aria-label="Run test from">
-                            {modes.map((item) => {
-                                const disabled = modeDisabled(item.value);
-                                return (
-                                    <button
-                                        aria-checked={mode === item.value}
-                                        className={`mode-option ${mode === item.value ? "mode-selected" : ""}`}
-                                        disabled={disabled || loading}
-                                        key={item.value}
-                                        onClick={() => setMode(item.value)}
-                                        role="radio"
-                                        type="button"
-                                    >
-                                        <span className="mode-radio"><i /></span>
-                                        <span><strong>{item.title}</strong><small>{item.description}</small></span>
-                                        {disabled && <em>Unavailable here</em>}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        <fieldset className="mode-fieldset">
+                            <legend className="field-label">Run test from</legend>
+                            <div className="mode-grid">
+                                {modes.map((item, index) => {
+                                    const disabled = modeDisabled(item.value);
+                                    return (
+                                        <label
+                                            className={`mode-option ${mode === item.value ? "mode-selected" : ""}`}
+                                            key={item.value}
+                                        >
+                                            <input
+                                                checked={mode === item.value}
+                                                disabled={disabled || loading}
+                                                name="diagnostic-mode"
+                                                onChange={() => setMode(item.value)}
+                                                type="radio"
+                                                value={item.value}
+                                            />
+                                            <span className="mode-number">0{index + 1}</span>
+                                            <span className="mode-copy">
+                                                <strong>{item.title}</strong>
+                                                <small>{item.description}</small>
+                                            </span>
+                                            <span className="mode-radio"><i /></span>
+                                            {disabled && <em>Unavailable here</em>}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </fieldset>
+
+                        <ScanProgress loading={loading} mode={mode} />
                     </form>
                 </Card.Content>
             </Card>
