@@ -1,8 +1,9 @@
 import hmac
 import os
+from pathlib import Path
 
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 
 from app_settings import SettingsError, validate_settings
 from database import (
@@ -24,6 +25,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config["DATABASE"] = f"{app.instance_path}/servicepath.db"
+app.config["ENV_FILE"] = str(Path(app.root_path) / ".env")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 init_db(app.config["DATABASE"])
 
@@ -90,7 +92,27 @@ def app_settings_payload():
         "password_required": bool(os.getenv("SETTINGS_PASSWORD")),
         "api_token_configured": bool(os.getenv("SERVICEPATH_API_TOKEN")),
         "ai_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "openai_model": os.getenv("OPENAI_MODEL", "gpt-5.6"),
     }
+
+
+def update_environment_settings(data):
+    values = {
+        "SERVICEPATH_API_TOKEN": data.get("servicepath_api_token", ""),
+        "OPENAI_API_KEY": data.get("openai_api_key", ""),
+        "OPENAI_MODEL": data.get("openai_model", ""),
+        "SETTINGS_PASSWORD": data.get("new_settings_password", ""),
+    }
+    env_path = Path(app.config["ENV_FILE"])
+
+    for name, value in values.items():
+        value = str(value).strip()
+        if not value:
+            continue
+        env_path.touch(mode=0o600, exist_ok=True)
+        env_path.chmod(0o600)
+        set_key(str(env_path), name, value)
+        os.environ[name] = value
 
 
 @app.route("/settings", methods=["GET", "POST"])
@@ -155,6 +177,7 @@ def api_app_settings():
     except SettingsError as error:
         return jsonify({"error": str(error)}), 400
 
+    update_environment_settings(data)
     update_settings(app.config["DATABASE"], values)
     return jsonify(app_settings_payload())
 

@@ -42,8 +42,10 @@ def unconfigured_analysis():
 class RouteTests(unittest.TestCase):
     def setUp(self):
         self.temporary_directory = tempfile.TemporaryDirectory()
+        self.original_env_file = app.config["ENV_FILE"]
         app.config["TESTING"] = True
         app.config["DATABASE"] = str(Path(self.temporary_directory.name) / "test.db")
+        app.config["ENV_FILE"] = str(Path(self.temporary_directory.name) / ".env")
         init_db(app.config["DATABASE"])
         update_settings(
             app.config["DATABASE"],
@@ -52,6 +54,7 @@ class RouteTests(unittest.TestCase):
         self.client = app.test_client()
 
     def tearDown(self):
+        app.config["ENV_FILE"] = self.original_env_file
         self.temporary_directory.cleanup()
 
     def assert_frontend_response(self, response):
@@ -104,6 +107,34 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         settings = response.get_json()["settings"]
         self.assertEqual(settings["remote_service_url"], "https://servicepath.example")
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_frontend_settings_api_saves_secrets_to_env_file(self):
+        response = self.client.post(
+            "/api/app-settings",
+            json={
+                "instance_role": "local_device",
+                "remote_service_url": "",
+                "settings_password": "",
+                "servicepath_api_token": "remote-token",
+                "openai_api_key": "openai-key",
+                "openai_model": "gpt-test",
+                "new_settings_password": "new-password",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data["api_token_configured"])
+        self.assertTrue(data["ai_configured"])
+        self.assertTrue(data["password_required"])
+        self.assertEqual(data["openai_model"], "gpt-test")
+        self.assertNotIn("openai_api_key", data)
+
+        env_text = Path(app.config["ENV_FILE"]).read_text()
+        self.assertIn("SERVICEPATH_API_TOKEN='remote-token'", env_text)
+        self.assertIn("OPENAI_API_KEY='openai-key'", env_text)
+        self.assertIn("SETTINGS_PASSWORD='new-password'", env_text)
 
     @patch.dict(os.environ, {"SETTINGS_PASSWORD": "admin-secret"}, clear=True)
     def test_settings_reject_wrong_password(self):
