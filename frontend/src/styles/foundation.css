@@ -175,8 +175,11 @@ input {
 
 .brand-mark {
     position: relative;
+    display: grid;
     width: 36px;
     height: 36px;
+    flex: 0 0 auto;
+    place-items: center;
     border-color: rgba(110, 168, 254, 0.32);
     border-radius: 11px;
     background:
@@ -300,7 +303,8 @@ input {
 .app-footer {
     position: relative;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
+    gap: 22px;
     align-items: center;
     width: min(1280px, calc(100% - 48px));
     padding: 17px 0 22px;
@@ -478,13 +482,16 @@ input {
 
     .app-footer {
         align-items: center;
-        flex-direction: row;
-        gap: 12px;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
         padding-bottom: 20px;
+        text-align: center;
     }
 
     .footer-meta {
-        margin-left: auto;
+        justify-content: center;
+        margin-left: 0;
         white-space: nowrap;
     }
 
