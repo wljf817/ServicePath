@@ -5,6 +5,22 @@ import StatusBadge from "./StatusBadge";
 
 const waitingLayers = ["Client Network", "DNS", "TCP", "TLS", "HTTP"];
 
+function detailLines(value, prefix = "") {
+    const lines = [];
+
+    Object.entries(value || {}).forEach(([key, item]) => {
+        const label = prefix ? `${prefix} > ${key}` : key;
+        if (item && typeof item === "object" && !Array.isArray(item)) {
+            lines.push(...detailLines(item, label));
+        } else {
+            const display = Array.isArray(item) ? item.join(", ") || "None" : String(item);
+            lines.push({label, display});
+        }
+    });
+
+    return lines;
+}
+
 export default function LayerList({report}) {
     const layers = report?.layers || waitingLayers.map((name, index) => ({
         key: String(index),
@@ -23,19 +39,34 @@ export default function LayerList({report}) {
                 </div>
             </Card.Header>
             <Card.Content className="layer-stack">
-                {layers.map((layer, index) => (
-                    <div className="layer-row" key={layer.key}>
-                        <div className="layer-index">{String(index + 1).padStart(2, "0")}</div>
-                        <div className="layer-copy">
-                            <div>
-                                <strong>{layer.name}</strong>
-                                {layer.duration_ms > 0 && <span><ClockIcon size={13} /> {layer.duration_ms} ms</span>}
+                {layers.map((layer, index) => {
+                    const details = detailLines(layer.details);
+                    return (
+                        <div className={`layer-block layer-block-${layer.status}`} key={layer.key}>
+                            <div className="layer-row">
+                                <div className="layer-index">{String(index + 1).padStart(2, "0")}</div>
+                                <div className="layer-copy">
+                                    <div>
+                                        <strong>{layer.name}</strong>
+                                        {layer.duration_ms > 0 && <span><ClockIcon size={13} /> {layer.duration_ms} ms</span>}
+                                    </div>
+                                    <p>{layer.summary}</p>
+                                </div>
+                                <StatusBadge status={layer.status} />
                             </div>
-                            <p>{layer.summary}</p>
+                            {details.length > 0 && (
+                                <div className="layer-return-list">
+                                    {details.map((detail) => (
+                                        <div className="layer-return" key={detail.label}>
+                                            <span>{detail.label}</span>
+                                            <code>{detail.display}</code>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        <StatusBadge status={layer.status} />
-                    </div>
-                ))}
+                    );
+                })}
             </Card.Content>
         </Card>
     );
