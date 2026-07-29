@@ -42,6 +42,7 @@ class AnalysisTests(unittest.TestCase):
 
         self.assertEqual(analysis["source"], "rules")
         self.assertIn("AI analysis was unavailable", analysis["note"])
+        self.assertNotIn("service unavailable", analysis["note"])
 
 
 if __name__ == "__main__":

@@ -131,6 +131,8 @@ def analyze_report(report):
 
     try:
         return request_openai_analysis(report)
-    except Exception as error:
-        fallback["note"] = f"AI analysis was unavailable, so rule-based guidance was used: {error}"
+    except Exception:
+        fallback["note"] = (
+            "AI analysis was unavailable, so rule-based guidance was used instead."
+        )
         return fallback
