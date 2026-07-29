@@ -64,7 +64,7 @@ python -m unittest discover -s tests
 
 ## Optional AI analysis
 
-Add an API key to `.env`:
+Add an API key from the WebUI Settings page or directly in `.env`:
 
 ```text
 OPENAI_API_KEY=your_key_here
@@ -79,6 +79,8 @@ Open `/settings` to choose the role of the current Flask process:
 
 - **Deployed Remote Server:** Remote Test runs on the current server. This is the default and recommended role for the hosted website.
 - **Local Device:** Local Test runs on the current computer. Enter the deployed server URL to enable Remote Test and Compare Both.
+
+The same page can configure the Remote API token, OpenAI API key and model, and Settings password. New secrets are written to `.env` with owner-only file permissions. Existing secret values are never returned to the browser; leaving a secret field blank keeps its current value.
 
 On a public deployment, set an administrator password before changing settings:
 
