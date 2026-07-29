@@ -152,6 +152,31 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"https://example.com/", response.data)
 
+    @patch("app.run_selected_diagnostics")
+    @patch("app.analyze_report")
+    def test_async_diagnosis_returns_report_url(self, analyze_report, run_selected):
+        run_selected.return_value = sample_report()
+        analyze_report.return_value = unconfigured_analysis()
+
+        response = self.client.post(
+            "/diagnose",
+            data={"domain": "example.com", "mode": "local"},
+            headers={"Accept": "application/json"},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertRegex(response.get_json()["report_url"], r"^/reports/\d+$")
+
+    def test_async_diagnosis_returns_json_error(self):
+        response = self.client.post(
+            "/diagnose",
+            data={"domain": "example.com", "mode": "invalid"},
+            headers={"Accept": "application/json"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "Invalid test mode.")
+
     def test_remote_mode_is_not_configured_yet(self):
         with patch.dict(os.environ, {}, clear=True):
             response = self.client.post(

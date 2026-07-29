@@ -141,13 +141,29 @@ def view_report(report_id):
     )
 
 
+def diagnosis_error(message, status_code, domain, mode):
+    if request.headers.get("Accept") == "application/json":
+        return jsonify({"error": message}), status_code
+
+    return (
+        render_template(
+            "index.html",
+            error=message,
+            domain=domain,
+            mode=mode,
+            app_settings=get_settings(app.config["DATABASE"]),
+        ),
+        status_code,
+    )
+
+
 @app.route("/diagnose", methods=["POST"])
 def diagnose():
     domain = request.form.get("domain", "").strip()
     mode = request.form.get("mode", "local")
 
     if mode not in {"local", "remote", "compare"}:
-        return render_template("index.html", error="Invalid test mode.", domain=domain), 400
+        return diagnosis_error("Invalid test mode.", 400, domain, mode)
 
     try:
         current_settings = get_settings(app.config["DATABASE"])
@@ -159,20 +175,16 @@ def diagnose():
             status_code = 409
         else:
             status_code = 400
-        return (
-            render_template(
-                "index.html",
-                error=str(error),
-                domain=domain,
-                mode=mode,
-                app_settings=get_settings(app.config["DATABASE"]),
-            ),
-            status_code,
-        )
+        return diagnosis_error(str(error), status_code, domain, mode)
 
     report["analysis"] = analyze_report(report)
     report_id = save_report(app.config["DATABASE"], report)
-    return redirect(url_for("view_report", report_id=report_id))
+    report_url = url_for("view_report", report_id=report_id)
+
+    if request.headers.get("Accept") == "application/json":
+        return jsonify({"report_url": report_url}), 201
+
+    return redirect(report_url)
 
 
 @app.route("/api/diagnose", methods=["POST"])
