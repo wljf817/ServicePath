@@ -10,6 +10,12 @@ ServicePath is a Flask website diagnostic tool. Enter a domain or HTTP(S) URL an
 
 Every layer reports **Passed**, **Warning**, **Error**, or **Skipped**. ServicePath identifies the first problem layer and produces repair guidance. An OpenAI API key enables AI-generated analysis; without a key, the app uses built-in rule-based guidance.
 
+The interface has three modes:
+
+- **Local Test:** runs from the computer hosting the current Flask process.
+- **Remote Test:** asks a configured deployed ServicePath server to run the checks.
+- **Compare Both:** runs both tests and classifies the result as local-only, remote-only, shared, different, or no issue.
+
 ## Project structure
 
 ```text
@@ -64,15 +70,18 @@ SERVICEPATH_API_TOKEN=choose-a-long-random-token
 
 Set the same `SERVICEPATH_API_TOKEN` on the remote instance. Remote Test calls `POST /api/diagnose`; the target checks run from the deployed server, while the returned report is analyzed and saved by the local app.
 
+Compare Both requires the same remote configuration. It stores the two complete reports, a five-layer side-by-side comparison, and one combined analysis in SQLite.
+
 ## Course requirements completed
 
 - **Persistent data store:** SQLite reports are created and read in `database.py`.
-- **Meaningful POST:** `POST /diagnose` runs diagnostics, analyzes the result, saves it, and redirects to a report. `POST /api/diagnose` runs remote checks.
+- **Meaningful POST:** `POST /diagnose` runs local, remote, or comparison diagnostics, analyzes the result, saves it, and redirects to a report. `POST /api/diagnose` runs remote checks.
 - **Public hosting:** deployment is supported but no live deployment is included in this repository yet.
 
 ## Known limitations
 
 - Console lines appear when the request finishes; they are not streamed live.
+- Compare Both runs Local Test and Remote Test one after the other, so it takes longer than either individual mode.
 - Client Network reports local routes and proxy presence, not public IP, ISP, ASN, or location.
 - DNS uses the system resolver and does not yet compare public resolvers or query CNAME/WHOIS data.
 - SQLite requires a persistent filesystem when deployed; a temporary serverless filesystem will lose history.
