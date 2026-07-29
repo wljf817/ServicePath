@@ -100,9 +100,10 @@ class ProxyDiagnosticTests(unittest.TestCase):
             allow_proxy_fake_ip=True,
         )
 
+    @patch("diagnostics.runner.check_http")
     @patch("diagnostics.runner.check_dns")
     @patch("diagnostics.runner.check_client_network")
-    def test_remote_test_does_not_allow_proxy_fake_ip(self, client_network, dns):
+    def test_remote_test_uses_detected_proxy(self, client_network, dns, http):
         network_result = make_result(
             "client",
             "Client Network",
@@ -111,18 +112,31 @@ class ProxyDiagnosticTests(unittest.TestCase):
         )
         network_result["proxy_detected"] = True
         client_network.return_value = network_result
-        dns.return_value = make_result(
+
+        dns_result = make_result(
             "dns",
             "DNS",
-            "error",
-            "Reserved address.",
-            details={"addresses": []},
+            "warning",
+            "Fake-IP detected.",
+            details={"addresses": ["198.18.0.10"]},
+        )
+        dns_result["proxy_fake_ip"] = True
+        dns.return_value = dns_result
+        http.return_value = make_result(
+            "http",
+            "HTTP",
+            "passed",
+            "HTTP passed.",
         )
 
-        run_diagnostics("example.com", mode="remote")
+        report = run_diagnostics("example.com", mode="remote")
 
-        dns.assert_called_once()
-        self.assertFalse(dns.call_args.kwargs["allow_proxy_fake_ip"])
+        self.assertTrue(dns.call_args.kwargs["allow_proxy_fake_ip"])
+        http.assert_called_once_with(
+            report["target"],
+            use_proxy=True,
+            allow_proxy_fake_ip=True,
+        )
 
     @patch("diagnostics.http.resolve_addresses")
     @patch("diagnostics.http.requests.Session")

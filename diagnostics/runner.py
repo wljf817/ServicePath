@@ -37,7 +37,7 @@ def run_diagnostics(value, mode="local"):
     layers.append(network_result)
 
     proxy_detected = network_result.get("proxy_detected", False)
-    allow_proxy_fake_ip = mode == "local" and proxy_detected
+    allow_proxy_fake_ip = proxy_detected
     dns_result = check_dns(target, allow_proxy_fake_ip=allow_proxy_fake_ip)
     layers.append(dns_result)
 
