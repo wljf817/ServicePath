@@ -1,6 +1,6 @@
 # ServicePath
 
-ServicePath is a Flask website diagnostic tool. Enter a domain or HTTP(S) URL and it checks five layers in order:
+ServicePath is a Flask website diagnostic tool with a React and HeroUI frontend. Enter a domain or HTTP(S) URL and it checks five layers in order:
 
 1. Client network routes and proxy settings
 2. DNS A and AAAA resolution
@@ -19,11 +19,12 @@ The interface has three modes:
 ## Project structure
 
 ```text
-app.py                 Flask routes
+app.py                 Flask routes and JSON API
 database.py            SQLite report storage
 diagnostics/           Target validation and five diagnostic layers
-templates/             Jinja pages
-static/                 CSS and small loading-state script
+frontend/              React 19 and HeroUI v3 source
+static/frontend/       Production frontend build served by Flask
+templates/             Fallback Jinja error pages
 tests/                  unittest test suite
 instance/servicepath.db Local diagnostic history (created automatically)
 ```
@@ -41,6 +42,19 @@ python app.py
 ```
 
 Open `http://127.0.0.1:5050`. Port 5050 avoids a common macOS conflict on port 5000.
+
+The production frontend is committed in `static/frontend/`, so Node.js is not required just to run the app. To change the UI, install the frontend dependencies and run the Vite development server in a second terminal:
+
+```bash
+npm install
+npm run dev
+```
+
+Keep Flask running on port 5050 and open `http://127.0.0.1:5173`. Vite forwards API requests to Flask. After frontend changes, create the production assets with:
+
+```bash
+npm run build
+```
 
 Run the tests with:
 
