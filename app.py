@@ -4,7 +4,15 @@ import os
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 from dotenv import load_dotenv
 
-from database import get_report, init_db, list_reports, save_report
+from app_settings import SettingsError, validate_settings
+from database import (
+    get_report,
+    get_settings,
+    init_db,
+    list_reports,
+    save_report,
+    update_settings,
+)
 from diagnostics.analysis import analyze_report
 from diagnostics.compare import compare_reports
 from diagnostics.remote import RemoteError, run_remote_diagnostics
@@ -40,6 +48,52 @@ def index():
 def history():
     reports = list_reports(app.config["DATABASE"])
     return render_template("history.html", reports=reports)
+
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings_page():
+    current_settings = get_settings(app.config["DATABASE"])
+    error = None
+
+    if request.method == "POST":
+        expected_password = os.getenv("SETTINGS_PASSWORD", "")
+        supplied_password = request.form.get("settings_password", "")
+        is_local_request = request.remote_addr in {"127.0.0.1", "::1"}
+
+        if expected_password:
+            authorized = hmac.compare_digest(supplied_password, expected_password)
+        else:
+            authorized = is_local_request
+
+        if not authorized:
+            error = "The settings password is incorrect."
+        else:
+            try:
+                values = validate_settings(
+                    request.form.get("instance_role", ""),
+                    request.form.get("remote_service_url", ""),
+                )
+                update_settings(app.config["DATABASE"], values)
+                return redirect(url_for("settings_page", saved="1"))
+            except SettingsError as settings_error:
+                error = str(settings_error)
+                current_settings = {
+                    "instance_role": request.form.get("instance_role", ""),
+                    "remote_service_url": request.form.get("remote_service_url", ""),
+                }
+
+    return (
+        render_template(
+            "settings.html",
+            settings=current_settings,
+            error=error,
+            saved=request.args.get("saved") == "1",
+            password_required=bool(os.getenv("SETTINGS_PASSWORD")),
+            api_token_configured=bool(os.getenv("SERVICEPATH_API_TOKEN")),
+            ai_configured=bool(os.getenv("OPENAI_API_KEY")),
+        ),
+        403 if error == "The settings password is incorrect." else 200,
+    )
 
 
 @app.route("/reports/<int:report_id>")

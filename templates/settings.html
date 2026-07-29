@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings · ServicePath</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{{ url_for('index') }}">
+            <span class="brand-mark">SP</span>
+            <span>ServicePath</span>
+        </a>
+        <nav>
+            <a href="{{ url_for('index') }}">New test</a>
+            <a href="{{ url_for('history') }}">History</a>
+            <a href="{{ url_for('settings_page') }}">Settings</a>
+        </nav>
+    </header>
+
+    <main class="page settings-page">
+        <section class="intro">
+            <p class="eyebrow">CONFIGURATION</p>
+            <h1>Instance settings</h1>
+            <p class="intro-text">
+                Tell ServicePath where this Flask process is running and where to find
+                the deployed remote server.
+            </p>
+        </section>
+
+        <section class="settings-card">
+            {% if saved %}
+                <p class="settings-success">Settings saved successfully.</p>
+            {% endif %}
+            {% if error %}
+                <p class="form-error settings-message">{{ error }}</p>
+            {% endif %}
+
+            <form action="{{ url_for('settings_page') }}" method="post">
+                <fieldset>
+                    <legend>Where is this ServicePath instance running?</legend>
+                    <div class="settings-options">
+                        <label class="mode-card">
+                            <input
+                                type="radio"
+                                name="instance_role"
+                                value="remote_server"
+                                {% if settings.instance_role == 'remote_server' %}checked{% endif %}
+                            >
+                            <span>
+                                <strong>Deployed Remote Server</strong>
+                                <small>Remote Test runs directly on this server.</small>
+                            </span>
+                        </label>
+                        <label class="mode-card">
+                            <input
+                                type="radio"
+                                name="instance_role"
+                                value="local_device"
+                                {% if settings.instance_role == 'local_device' %}checked{% endif %}
+                            >
+                            <span>
+                                <strong>Local Device</strong>
+                                <small>This Flask process runs on the user's computer.</small>
+                            </span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                <label class="settings-label" for="remote-service-url">
+                    Deployed Remote Service URL
+                </label>
+                <input
+                    id="remote-service-url"
+                    name="remote_service_url"
+                    type="url"
+                    placeholder="https://servicepath.example"
+                    value="{{ settings.remote_service_url }}"
+                >
+                <p class="field-help">
+                    Used by a Local Device instance for Remote Test and Compare Both.
+                </p>
+
+                <label class="settings-label" for="settings-password">
+                    Settings password
+                </label>
+                <input
+                    id="settings-password"
+                    name="settings_password"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="{% if password_required %}Required on this server{% else %}Not required from localhost{% endif %}"
+                >
+
+                <button type="submit">Save settings</button>
+            </form>
+        </section>
+
+        <section class="configuration-status">
+            <div>
+                <strong>Remote API token</strong>
+                <span class="config-{{ 'ready' if api_token_configured else 'missing' }}">
+                    {{ 'Configured' if api_token_configured else 'Not configured' }}
+                </span>
+            </div>
+            <div>
+                <strong>OpenAI analysis</strong>
+                <span class="config-{{ 'ready' if ai_configured else 'missing' }}">
+                    {{ 'Configured' if ai_configured else 'Using rule-based fallback' }}
+                </span>
+            </div>
+        </section>
+
+        <p class="security-note">
+            Secrets stay in the server's <code>.env</code> file. Settings never display or
+            store API keys and tokens.
+        </p>
+    </main>
+
+    <footer>ServicePath &middot; Built with Flask</footer>
+</body>
+</html>

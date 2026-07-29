@@ -137,6 +137,22 @@ input[type="text"] {
     font-size: 16px;
 }
 
+input[type="url"],
+input[type="password"] {
+    width: 100%;
+    padding: 13px 14px;
+    border: 1px solid #bdc8d0;
+    border-radius: 8px;
+    color: #17222d;
+    font-size: 15px;
+}
+
+input[type="url"]:focus,
+input[type="password"]:focus {
+    border-color: #0b7a75;
+    outline: 3px solid rgba(11, 122, 117, 0.13);
+}
+
 input[type="text"]:focus {
     border-color: #0b7a75;
     outline: 3px solid rgba(11, 122, 117, 0.13);
@@ -624,6 +640,90 @@ footer {
     text-decoration: none;
 }
 
+.settings-page {
+    max-width: 820px;
+}
+
+.settings-card {
+    padding: 28px;
+    background: #ffffff;
+    border: 1px solid #dce3e8;
+    border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(33, 54, 71, 0.06);
+}
+
+.settings-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 10px 0 24px;
+}
+
+.settings-label {
+    display: block;
+    margin: 22px 0 8px;
+}
+
+.field-help {
+    margin: 7px 0 0;
+    color: #73808a;
+    font-size: 12px;
+}
+
+.settings-card button {
+    margin-top: 24px;
+}
+
+.settings-success,
+.settings-message {
+    margin-bottom: 18px;
+    padding: 11px 13px;
+    border-radius: 7px;
+}
+
+.settings-success {
+    background: #e7f7ef;
+    color: #167a52;
+}
+
+.settings-message {
+    background: #fdebed;
+}
+
+.configuration-status {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.configuration-status div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid #dce3e8;
+    border-radius: 10px;
+    background: #ffffff;
+    font-size: 13px;
+}
+
+.config-ready {
+    color: #167a52;
+}
+
+.config-missing {
+    color: #8a6400;
+}
+
+.security-note {
+    margin: 18px 0 0;
+    color: #687680;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
 @media (max-width: 760px) {
     .page {
         padding-top: 42px;
@@ -637,6 +737,11 @@ footer {
     }
 
     .mode-options {
+        grid-template-columns: 1fr;
+    }
+
+    .settings-options,
+    .configuration-status {
         grid-template-columns: 1fr;
     }
 

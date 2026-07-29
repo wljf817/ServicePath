@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app import app
-from database import init_db
+from database import get_settings, init_db
 from diagnostics.result import make_result
 
 
@@ -47,6 +47,40 @@ class RouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Start diagnosis", response.data)
+
+    def test_settings_page_loads_default_role(self):
+        response = self.client.get("/settings")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Deployed Remote Server", response.data)
+
+    def test_local_request_can_update_settings(self):
+        response = self.client.post(
+            "/settings",
+            data={
+                "instance_role": "local_device",
+                "remote_service_url": "https://servicepath.example/",
+            },
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Settings saved successfully", response.data)
+        settings = get_settings(app.config["DATABASE"])
+        self.assertEqual(settings["instance_role"], "local_device")
+
+    @patch.dict(os.environ, {"SETTINGS_PASSWORD": "admin-secret"}, clear=True)
+    def test_settings_reject_wrong_password(self):
+        response = self.client.post(
+            "/settings",
+            data={
+                "instance_role": "remote_server",
+                "remote_service_url": "",
+                "settings_password": "wrong",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
 
     @patch("app.run_diagnostics")
     @patch("app.analyze_report")
