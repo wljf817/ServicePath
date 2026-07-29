@@ -34,7 +34,7 @@ export default function DashboardPage({appSettings, navigate}) {
 
         try {
             const result = await startDiagnosis(domain, mode);
-            navigate(result.report_url);
+            navigate(result.report_url, {preserveScroll: true});
         } catch (requestError) {
             setError(requestError.message);
             setLoading(false);

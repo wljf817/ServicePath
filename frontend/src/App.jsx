@@ -26,10 +26,12 @@ export default function App() {
         return () => window.removeEventListener("popstate", updatePath);
     }, []);
 
-    function navigate(nextPath) {
+    function navigate(nextPath, options = {}) {
         window.history.pushState({}, "", nextPath);
         setPath(nextPath);
-        window.scrollTo({top: 0, behavior: "smooth"});
+        if (!options.preserveScroll) {
+            window.scrollTo({top: 0, behavior: "smooth"});
+        }
     }
 
     const reportMatch = path.match(/^\/reports\/(\d+)$/);
