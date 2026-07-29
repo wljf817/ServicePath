@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -78,13 +79,61 @@ class RouteTests(unittest.TestCase):
         self.assertIn(b"https://example.com/", response.data)
 
     def test_remote_mode_is_not_configured_yet(self):
+        with patch.dict(os.environ, {}, clear=True):
+            response = self.client.post(
+                "/diagnose",
+                data={"domain": "example.com", "mode": "remote"},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn(b"REMOTE_SERVICE_URL", response.data)
+
+    @patch("app.analyze_report")
+    @patch("app.run_remote_diagnostics")
+    def test_remote_diagnosis_displays_report(self, run_remote, analyze_report):
+        remote_report = sample_report()
+        remote_report["mode"] = "remote"
+        run_remote.return_value = remote_report
+        analyze_report.return_value = {
+            "source": "rules",
+            "title": "No failure was detected",
+            "explanation": "All checks passed.",
+            "causes": [],
+            "actions": [],
+        }
+
         response = self.client.post(
             "/diagnose",
             data={"domain": "example.com", "mode": "remote"},
+            follow_redirects=True,
         )
 
-        self.assertEqual(response.status_code, 503)
-        self.assertIn(b"Remote Test is not configured", response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Remote Test", response.data)
+        run_remote.assert_called_once_with("example.com")
+
+    @patch("app.run_diagnostics")
+    def test_api_returns_remote_report(self, run_diagnostics):
+        remote_report = sample_report()
+        remote_report["mode"] = "remote"
+        run_diagnostics.return_value = remote_report
+
+        response = self.client.post("/api/diagnose", json={"target": "example.com"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["mode"], "remote")
+        run_diagnostics.assert_called_once_with("example.com", mode="remote")
+
+    @patch.dict(os.environ, {"SERVICEPATH_API_TOKEN": "secret-token"}, clear=True)
+    def test_api_rejects_wrong_token(self):
+        response = self.client.post("/api/diagnose", json={"target": "example.com"})
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_api_rejects_non_object_json(self):
+        response = self.client.post("/api/diagnose", json=["example.com"])
+
+        self.assertEqual(response.status_code, 400)
 
 
 if __name__ == "__main__":
