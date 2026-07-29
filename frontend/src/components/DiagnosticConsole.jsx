@@ -1,6 +1,7 @@
 import {Card} from "@heroui/react";
+import {useState} from "react";
 
-import {TerminalIcon} from "./Icons";
+import {CopyIcon, TerminalIcon} from "./Icons";
 
 const statusLabels = {
     passed: "PASS",
@@ -26,6 +27,8 @@ function detailLines(value, prefix = "") {
 }
 
 export default function DiagnosticConsole({report, label = "Diagnostic Console", loading = false}) {
+    const [showRaw, setShowRaw] = useState(true);
+    const [copyState, setCopyState] = useState("Copy JSON");
     const checks = report
         ? report.layers.flatMap((layer) => (
             layer.key === "dns" && report.traceroute
@@ -34,6 +37,21 @@ export default function DiagnosticConsole({report, label = "Diagnostic Console",
         ))
         : [];
 
+    async function copyReport() {
+        if (!report) {
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
+            setCopyState("Copied");
+        } catch {
+            setCopyState("Copy failed");
+        }
+
+        window.setTimeout(() => setCopyState("Copy JSON"), 1800);
+    }
+
     return (
         <Card className="console-panel" variant="secondary">
             <Card.Header className="panel-header">
@@ -41,14 +59,37 @@ export default function DiagnosticConsole({report, label = "Diagnostic Console",
                     <span className="section-kicker">LIVE OUTPUT</span>
                     <Card.Title className="panel-title"><TerminalIcon size={18} /> {label}</Card.Title>
                 </div>
-                <span className={loading ? "live-dot live-dot-loading" : "live-dot"} />
+                <div className="console-actions">
+                    {report && (
+                        <>
+                            <button
+                                aria-pressed={showRaw}
+                                className={showRaw ? "console-action console-action-active" : "console-action"}
+                                onClick={() => setShowRaw((visible) => !visible)}
+                                type="button"
+                            >
+                                Raw {showRaw ? "on" : "off"}
+                            </button>
+                            <button className="console-action" onClick={copyReport} type="button">
+                                <CopyIcon size={13} /> {copyState}
+                            </button>
+                        </>
+                    )}
+                    <span className={loading ? "live-dot live-dot-loading" : "live-dot"} />
+                </div>
             </Card.Header>
             <Card.Content className="terminal-window">
+                <div className="terminal-chrome" aria-hidden="true">
+                    <span /><span /><span />
+                    <small>servicepath://diagnostics</small>
+                </div>
                 {loading && (
-                    <>
+                    <div className="terminal-loading" aria-live="polite">
                         <p><span className="term-info">[INFO]</span> Starting diagnostics...</p>
-                        <p><span className="term-run">[RUN]</span> Waiting for the five-layer report</p>
-                    </>
+                        <p><span className="term-run">[RUN]</span> Collecting five-layer evidence and route data</p>
+                        <p className="terminal-prompt"><span>servicepath</span> waiting for diagnostic return <i /></p>
+                        <div className="terminal-scan-line" aria-hidden="true" />
+                    </div>
                 )}
 
                 {!loading && !report && (
@@ -76,8 +117,12 @@ export default function DiagnosticConsole({report, label = "Diagnostic Console",
                                         <span className="term-return">[RETURN]</span> {detail.label}: {detail.display}
                                     </p>
                                 ))}
-                                <p className="terminal-indent raw-title"><span className="term-raw">[RAW RETURN]</span> {layer.name} function result</p>
-                                <pre>{JSON.stringify(layer, null, 2)}</pre>
+                                {showRaw && (
+                                    <div className="terminal-raw-block">
+                                        <p className="terminal-indent raw-title"><span className="term-raw">[RAW RETURN]</span> {layer.name} function result</p>
+                                        <pre>{JSON.stringify(layer, null, 2)}</pre>
+                                    </div>
+                                )}
                             </div>
                         ))}
                         <p className="terminal-done"><span className="term-info">[DONE]</span> Finished in {report.duration_ms} ms · {report.status.toUpperCase()}</p>

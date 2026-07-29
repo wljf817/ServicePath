@@ -1,6 +1,6 @@
 import {Card} from "@heroui/react";
 
-import {ClockIcon} from "./Icons";
+import {ChevronIcon, ClockIcon} from "./Icons";
 import StatusBadge from "./StatusBadge";
 
 const waitingLayers = [
@@ -50,6 +50,9 @@ export default function LayerList({report}) {
             summary: "Waiting to run",
             duration_ms: 0,
         }));
+    const firstIssueIndex = layers.findIndex((layer) => (
+        layer.status === "warning" || layer.status === "error"
+    ));
 
     return (
         <Card className="layers-panel" variant="secondary">
@@ -63,7 +66,12 @@ export default function LayerList({report}) {
                 {layers.map((layer, index) => {
                     const details = detailLines(layer.details);
                     return (
-                        <div className={`layer-block layer-block-${layer.status}`} key={layer.key}>
+                        <div
+                            className={`layer-block layer-block-${layer.status}`}
+                            key={layer.key}
+                            style={{"--layer-delay": `${index * 55}ms`}}
+                        >
+                            <span className="layer-connector" aria-hidden="true" />
                             <div className="layer-row">
                                 <div className="layer-index">
                                     {layerNumbers[layer.key] || String(index + 1).padStart(2, "0")}
@@ -82,16 +90,22 @@ export default function LayerList({report}) {
                                 <StatusBadge status={layer.status} />
                             </div>
                             {details.length > 0 && (
-                                <div className="layer-return-list">
-                                    {details.map((detail) => (
-                                        <div className="layer-return" key={detail.label}>
-                                            <span>{detail.label}</span>
-                                            <code className={detail.display.includes("\n") ? "layer-multiline" : ""}>
-                                                {detail.display}
-                                            </code>
-                                        </div>
-                                    ))}
-                                </div>
+                                <details className="layer-details" open={index === firstIssueIndex}>
+                                    <summary>
+                                        <span>{details.length} returned fields</span>
+                                        <ChevronIcon size={15} />
+                                    </summary>
+                                    <div className="layer-return-list">
+                                        {details.map((detail) => (
+                                            <div className="layer-return" key={detail.label}>
+                                                <span>{detail.label}</span>
+                                                <code className={detail.display.includes("\n") ? "layer-multiline" : ""}>
+                                                    {detail.display}
+                                                </code>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </details>
                             )}
                         </div>
                     );

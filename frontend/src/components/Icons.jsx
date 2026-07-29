@@ -38,6 +38,23 @@ export function ClockIcon(props) {
     );
 }
 
+export function ChevronIcon(props) {
+    return (
+        <Icon {...props}>
+            <path d="m8 10 4 4 4-4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+        </Icon>
+    );
+}
+
+export function CopyIcon(props) {
+    return (
+        <Icon {...props}>
+            <rect height="13" rx="2" stroke="currentColor" strokeWidth="1.8" width="13" x="8" y="8" />
+            <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+        </Icon>
+    );
+}
+
 export function GlobeIcon(props) {
     return (
         <Icon {...props}>
