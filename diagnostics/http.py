@@ -46,10 +46,15 @@ def _server_features(headers):
     return features or ["No basic CDN/WAF signature detected"]
 
 
-def check_http(target, timeout=6):
+def check_http(
+    target,
+    timeout=6,
+    use_proxy=False,
+    allow_proxy_fake_ip=False,
+):
     started = perf_counter()
     session = requests.Session()
-    session.trust_env = False
+    session.trust_env = use_proxy
     current_url = target["url"]
     redirects = []
 
@@ -57,7 +62,7 @@ def check_http(target, timeout=6):
         for _ in range(MAX_REDIRECTS + 1):
             current_target = normalize_target(current_url)
             ipv4, ipv6 = resolve_addresses(current_target["hostname"])
-            validate_public_addresses(ipv4 + ipv6)
+            validate_public_addresses(ipv4 + ipv6, allow_proxy_fake_ip)
 
             response = session.get(
                 current_target["url"],
@@ -86,6 +91,7 @@ def check_http(target, timeout=6):
 
             details = {
                 "Requested URL": target["url"],
+                "System proxy": "Used" if use_proxy else "Not used",
                 "Status code": status_code,
                 "Final URL": final_url,
                 "Redirects": redirects,
@@ -119,6 +125,7 @@ def check_http(target, timeout=6):
             {
                 "Requested URL": target["url"],
                 "Last URL": current_url,
+                "System proxy": "Used" if use_proxy else "Not used",
                 "Error": str(error),
             },
         )

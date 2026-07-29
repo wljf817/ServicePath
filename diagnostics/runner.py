@@ -33,8 +33,12 @@ def run_diagnostics(value, mode="local"):
     target = normalize_target(value)
     layers = []
 
-    layers.append(check_client_network())
-    dns_result = check_dns(target)
+    network_result = check_client_network()
+    layers.append(network_result)
+
+    proxy_detected = network_result.get("proxy_detected", False)
+    allow_proxy_fake_ip = mode == "local" and proxy_detected
+    dns_result = check_dns(target, allow_proxy_fake_ip=allow_proxy_fake_ip)
     layers.append(dns_result)
 
     if dns_result["status"] == "error":
@@ -43,6 +47,26 @@ def run_diagnostics(value, mode="local"):
                 skipped_result("tcp", "TCP", "Skipped because DNS failed."),
                 skipped_result("tls", "TLS", "Skipped because DNS failed."),
                 skipped_result("http", "HTTP", "Skipped because DNS failed."),
+            ]
+        )
+    elif dns_result.get("proxy_fake_ip"):
+        layers.extend(
+            [
+                skipped_result(
+                    "tcp",
+                    "TCP",
+                    "Skipped because proxy DNS returned a synthetic IP address.",
+                ),
+                skipped_result(
+                    "tls",
+                    "TLS",
+                    "Skipped because proxy DNS returned a synthetic IP address.",
+                ),
+                check_http(
+                    target,
+                    use_proxy=True,
+                    allow_proxy_fake_ip=True,
+                ),
             ]
         )
     else:

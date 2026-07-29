@@ -102,6 +102,7 @@ The local instance calls `POST /api/diagnose` on the deployed server. Compare Bo
 - Console lines appear when the request finishes; they are not streamed live.
 - Compare Both runs Local Test and Remote Test one after the other, so it takes longer than either individual mode.
 - A deployed webpage cannot perform raw DNS, TCP, or TLS checks from a visitor's device. Local Test and Compare Both therefore require the user to start the local Flask instance.
+- Local Test recognizes proxy Fake-IP DNS in `198.18.0.0/15`. It skips misleading raw TCP/TLS checks and runs the HTTP check through the detected system proxy.
 - Client Network reports local routes and proxy presence, not public IP, ISP, ASN, or location.
 - DNS uses the system resolver and does not yet compare public resolvers or query CNAME/WHOIS data.
 - SQLite requires a persistent filesystem when deployed; a temporary serverless filesystem will lose history.
