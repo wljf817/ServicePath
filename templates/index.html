@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ServicePath</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
     <header class="site-header">
@@ -26,7 +27,7 @@
         </section>
 
         <section class="search-card">
-            <form action="{{ url_for('diagnose') }}" method="post">
+            <form id="diagnostic-form" action="{{ url_for('diagnose') }}" method="post">
                 <label for="domain">Website or domain</label>
                 <div class="search-row">
                     <input
@@ -38,7 +39,7 @@
                         autocomplete="off"
                         required
                     >
-                    <button type="submit">Start diagnosis</button>
+                    <button id="submit-button" type="submit">Start diagnosis</button>
                 </div>
 
                 {% if error %}
@@ -89,16 +90,28 @@
                 </div>
 
                 <div class="console">
-                    {% if submitted %}
-                        <p><span class="info">[INFO]</span> Target: {{ domain }}</p>
-                        <p><span class="info">[INFO]</span> Mode: {{ mode|title }} Test</p>
-                        <p><span class="ready">[READY]</span> The interface is ready for the diagnostic code.</p>
+                    <div id="console-output">
+                    {% if report %}
+                        <p><span class="info">[INFO]</span> Target: {{ report.target.url }}</p>
+                        <p><span class="info">[INFO]</span> Mode: {{ report.mode|title }} Test</p>
+                        {% for layer in report.layers %}
+                            <p>
+                                <span class="{{ layer.status }}">[{{ layer.status|upper }}]</span>
+                                {{ layer.name }} — {{ layer.summary }}
+                                {% if layer.duration_ms %}({{ layer.duration_ms }} ms){% endif %}
+                            </p>
+                        {% endfor %}
+                        <p>
+                            <span class="info">[DONE]</span>
+                            Finished in {{ report.duration_ms }} ms. Overall status: {{ report.status|upper }}.
+                        </p>
                     {% elif error %}
                         <p><span class="error">[ERROR]</span> {{ error }}</p>
                     {% else %}
                         <p><span class="ready">[READY]</span> Waiting for a website to test...</p>
                         <p class="muted">Enter a domain above to begin.</p>
                     {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -110,13 +123,41 @@
                     </div>
                 </div>
 
-                <ol class="layers-list">
-                    <li><span>01</span><strong>Client Network</strong><em>Waiting</em></li>
-                    <li><span>02</span><strong>DNS</strong><em>Waiting</em></li>
-                    <li><span>03</span><strong>TCP</strong><em>Waiting</em></li>
-                    <li><span>04</span><strong>TLS</strong><em>Waiting</em></li>
-                    <li><span>05</span><strong>HTTP</strong><em>Waiting</em></li>
-                </ol>
+                {% if report %}
+                    <ol class="layers-list">
+                        {% for layer in report.layers %}
+                            <li class="layer-item">
+                                <span>{{ "%02d"|format(loop.index) }}</span>
+                                <div>
+                                    <strong>{{ layer.name }}</strong>
+                                    <p>{{ layer.summary }}</p>
+                                    {% if layer.details %}
+                                        <details>
+                                            <summary>View details</summary>
+                                            <dl>
+                                                {% for label, value in layer.details.items() %}
+                                                    {% if label != 'addresses' %}
+                                                        <dt>{{ label }}</dt>
+                                                        <dd>{{ value|format_detail }}</dd>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </dl>
+                                        </details>
+                                    {% endif %}
+                                </div>
+                                <em class="status-{{ layer.status }}">{{ layer.status|title }}</em>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% else %}
+                    <ol class="layers-list">
+                        <li><span>01</span><strong>Client Network</strong><em>Waiting</em></li>
+                        <li><span>02</span><strong>DNS</strong><em>Waiting</em></li>
+                        <li><span>03</span><strong>TCP</strong><em>Waiting</em></li>
+                        <li><span>04</span><strong>TLS</strong><em>Waiting</em></li>
+                        <li><span>05</span><strong>HTTP</strong><em>Waiting</em></li>
+                    </ol>
+                {% endif %}
             </div>
         </section>
 
@@ -125,7 +166,18 @@
             <div>
                 <p class="eyebrow">AI ANALYSIS</p>
                 <h2>Explanation and recommended actions</h2>
-                <p>AI guidance will appear here after all diagnostic layers finish.</p>
+                {% if report %}
+                    <p>
+                        {% if report.first_problem %}
+                            The first detected problem is in the {{ report.first_problem|upper }} layer.
+                        {% else %}
+                            All five diagnostic layers passed.
+                        {% endif %}
+                        AI guidance will be added in the next feature.
+                    </p>
+                {% else %}
+                    <p>AI guidance will appear here after all diagnostic layers finish.</p>
+                {% endif %}
             </div>
         </section>
     </main>

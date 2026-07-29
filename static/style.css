@@ -242,6 +242,18 @@ fieldset {
     color: #ff7d89;
 }
 
+.passed {
+    color: #53d39e;
+}
+
+.warning {
+    color: #ffcc66;
+}
+
+.skipped {
+    color: #9aa8b2;
+}
+
 .muted {
     color: #83939f;
 }
@@ -275,6 +287,13 @@ fieldset {
     font-size: 14px;
 }
 
+.layers-list p {
+    margin: 5px 0 0;
+    color: #687680;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
 .layers-list em {
     padding: 5px 8px;
     border-radius: 12px;
@@ -282,6 +301,54 @@ fieldset {
     color: #71808a;
     font-size: 11px;
     font-style: normal;
+}
+
+.layers-list .status-passed {
+    background: #e7f7ef;
+    color: #167a52;
+}
+
+.layers-list .status-warning {
+    background: #fff5d9;
+    color: #8a6400;
+}
+
+.layers-list .status-error {
+    background: #fdebed;
+    color: #b32838;
+}
+
+.layers-list .status-skipped {
+    background: #edf1f3;
+    color: #71808a;
+}
+
+details {
+    margin-top: 9px;
+    color: #0b7a75;
+    font-size: 12px;
+}
+
+details summary {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+dl {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 5px 10px;
+    margin: 10px 0 0;
+    color: #56636d;
+}
+
+dt {
+    font-weight: bold;
+}
+
+dd {
+    margin: 0;
+    overflow-wrap: anywhere;
 }
 
 .ai-card {
