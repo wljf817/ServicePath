@@ -26,7 +26,6 @@ async function loadReport(reportUrl) {
     document.querySelector("main").replaceWith(newMain);
     document.title = reportPage.title;
     window.history.pushState({}, "", reportUrl);
-    window.scrollTo({top: 0, behavior: "smooth"});
 }
 
 document.addEventListener("submit", async function (event) {
