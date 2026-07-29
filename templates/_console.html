@@ -21,6 +21,11 @@
                 {{ detail.label }}: {{ detail.value }}
             </p>
         {% endfor %}
+        <p class="console-detail console-raw-label">
+            <span class="raw-return">[RAW RETURN]</span>
+            {{ layer.name }} function result
+        </p>
+        <pre class="console-raw">{{ layer|tojson(indent=2) }}</pre>
     {% endfor %}
 
     <p class="console-done">

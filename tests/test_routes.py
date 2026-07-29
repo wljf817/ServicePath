@@ -129,6 +129,8 @@ class RouteTests(unittest.TestCase):
         self.assertIn(b"DNS passed", response.data)
         self.assertIn(b"AI analysis is not configured", response.data)
         self.assertIn(b"[RETURN]", response.data)
+        self.assertIn(b"[RAW RETURN]", response.data)
+        self.assertIn(b'"key": "dns"', response.data)
         self.assertIn(b"93.184.216.34", response.data)
         self.assertIn(b"System resolver", response.data)
         run_selected.assert_called_once_with(

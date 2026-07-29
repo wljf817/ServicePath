@@ -309,6 +309,27 @@ fieldset {
     color: #b8a7f2;
 }
 
+.raw-return {
+    color: #f0a96b;
+}
+
+.console-raw-label {
+    margin-top: 10px;
+}
+
+.console-raw {
+    margin: 6px 0 16px 18px;
+    padding: 12px;
+    overflow-x: auto;
+    border: 1px solid #3a4a56;
+    border-radius: 6px;
+    background: #101a22;
+    color: #c9d5db;
+    font: inherit;
+    line-height: 1.5;
+    white-space: pre;
+}
+
 .error {
     color: #ff7d89;
 }
