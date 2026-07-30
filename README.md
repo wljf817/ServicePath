@@ -1,34 +1,75 @@
 # ServicePath
 
-ServicePath is a Flask website diagnostic tool with a React and HeroUI frontend. Enter a domain or HTTP(S) URL and it checks five layers in order:
+ServicePath is a Flask and React website-diagnostic application driven by one
+OpenAI Agents SDK Agent per execution location. Give it a public HTTP(S) target;
+the Agent selects the useful checks, follows the returned evidence, and produces
+a structured diagnosis rather than running a fixed five-step script.
 
-1. Client network routes and proxy settings
-2. DNS A and AAAA resolution
-3. TCP connectivity on ports 80 and 443
-4. TLS handshake, certificate trust, expiration, and hostname match
-5. HTTP status, redirects, response time, page title, and basic CDN/WAF headers
+The Agent can select from six server-owned tools:
 
-ServicePath also runs a supplemental Traceroute between DNS and TCP. It records up to eight hops, the executed command, return code, timing, and raw output without changing the five-layer fault classification.
+- Client routes and proxy settings
+- DNS A/AAAA resolution and public-address validation
+- TCP connectivity
+- TLS handshake and certificate validation
+- HTTP response, redirects, timing, title, and basic CDN/WAF headers
+- A short traceroute
 
-Every check reports **Passed**, **Warning**, **Error**, or **Skipped**. The console expands each check into its timing and returned sub-check values. ServicePath identifies the first problem layer. An OpenAI API key enables AI-generated analysis; without a key, the report lists detected warnings and errors without generating advice.
+Tool prerequisites are collected automatically and cached. For example, asking
+for TLS also obtains the DNS and TCP evidence it needs, but each underlying check
+runs at most once. The report retains the Agent's selection order, every actual
+check, timings, structured fields, raw tool returns, confidence, likely causes,
+suggested next actions, and aggregate model/token usage.
 
-The interface has three modes:
+If the Agent service fails after tools have already run, ServicePath saves those
+results with an explicit low-confidence partial conclusion instead of discarding
+the evidence.
 
-- **Remote Test:** runs directly on the deployed ServicePath server. This is the default mode.
-- **Local Test:** runs from a ServicePath instance started on the user's computer.
-- **Compare Both:** is available from the local instance and classifies the result as local-only, remote-only, shared, different, or no issue.
+## Why an Agent
+
+The OpenAI Agents SDK supplies the tool-use loop: the model chooses a tool,
+receives its result, decides whether another check is useful, and finally returns
+a typed `AgentDiagnosis`. There are no handoffs or specialist sub-agents.
+
+ServicePath—not the model—owns the safety boundary:
+
+- The target is normalized and locked before the Agent starts.
+- Tool schemas accept no hostname, URL, command, port, or shell argument.
+- Private, loopback, link-local, and reserved targets are rejected.
+- DNS answers and every HTTP redirect are revalidated.
+- Connection attempts, response bodies, redirects, traceroute output, Agent
+  turns, and unique checks have explicit limits and per-tool timeouts.
+- Traceroute is launched with a fixed argument list and never through a shell.
+- Agents SDK traces exclude sensitive prompt and tool-return content.
+
+This is a bounded capability layer inside the Flask process, not a replacement
+for an operating-system sandbox. A production deployment should still enforce an
+outbound firewall or container network policy.
+
+## Execution modes
+
+- **Remote Test:** runs one Agent on the deployed ServicePath server.
+- **Local Test:** runs one Agent in a ServicePath instance started on the user's
+  computer, so it observes that device and network.
+- **Compare Both:** runs the local and remote investigations sequentially and
+  compares the evidence each Agent chose to collect.
+
+A normal diagnosis uses at most six unique checks and eight Agent turns. Repeated
+tool selections return cached evidence instead of repeating network traffic.
 
 ## Project structure
 
 ```text
-app.py                 Flask routes and JSON API
-database.py            SQLite report storage
-diagnostics/           Target validation and five diagnostic layers
-frontend/              React 19 and HeroUI v3 source
-static/frontend/       Production frontend build served by Flask
-templates/             Fallback Jinja error pages
-tests/                  unittest test suite
-instance/servicepath.db Local diagnostic history (created automatically)
+app.py                       Flask pages and JSON routes
+database.py                  SQLite report and settings storage
+diagnostics/agent.py         Single-Agent runtime and report assembly
+diagnostics/agent_models.py  Typed Agent output
+diagnostics/agent_tools.py   Locked context, budgets, and Agent tools
+diagnostics/                 Network checks and target validation
+frontend/                    React 19 and HeroUI v3 source
+static/frontend/             Production frontend served by Flask
+templates/                   Non-JavaScript fallback/error pages
+tests/                       Offline unittest suite
+instance/servicepath.db      Local history, created automatically
 ```
 
 ## Install and run
@@ -40,90 +81,112 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-python app.py
 ```
 
-Open `http://127.0.0.1:5050`. Port 5050 avoids a common macOS conflict on port 5000.
-
-The production frontend is committed in `static/frontend/`, so Node.js is not required just to run the app. To change the UI, install the frontend dependencies and run the Vite development server in a second terminal:
-
-```bash
-npm install
-npm run dev
-```
-
-Keep Flask running on port 5050 and open `http://127.0.0.1:5173`. Vite forwards API requests to Flask. After frontend changes, create the production assets with:
-
-```bash
-npm run build
-```
-
-Run the tests with:
-
-```bash
-python -m unittest discover -s tests
-```
-
-## Optional AI analysis
-
-Add an API key from the WebUI Settings page or directly in `.env`:
+Set at least the Agent credentials in `.env`:
 
 ```text
 OPENAI_API_KEY=your_key_here
 OPENAI_MODEL=gpt-5.6
 ```
 
-Keys are read from the environment and `.env` is ignored by Git. The integration uses the OpenAI Responses API. If the API is unavailable, diagnostics still complete, but no analysis or repair advice is generated.
-
-## Settings and execution location
-
-Open `/settings` to choose the role of the current Flask process:
-
-- **Deployed Remote Server:** Remote Test runs on the current server. This is the default and recommended role for the hosted website.
-- **Local Device:** Local Test runs on the current computer. Enter the deployed server URL to enable Remote Test and Compare Both.
-
-The same page can configure the Remote API token, OpenAI API key and model, and Settings password. New secrets are written to `.env` with owner-only file permissions. Existing secret values are never returned to the browser; leaving a secret field blank keeps its current value.
-
-On a public deployment, set an administrator password before changing settings:
+To use a compatible gateway or local model server, set an optional API base URL
+in Settings or `.env`:
 
 ```text
-SETTINGS_PASSWORD=choose-a-strong-password
+OPENAI_BASE_URL=http://127.0.0.1:8000/v1
+OPENAI_API_MODE=auto
+OPENAI_MODEL=provider-model-name
 ```
 
-Localhost can update settings without a password. API keys and tokens are never stored in the settings database.
+In `auto` mode, the OpenAI default endpoint uses the Responses API and custom
+URLs use Chat Completions for broader provider compatibility. Set
+`OPENAI_API_MODE=responses` or `OPENAI_API_MODE=chat_completions` to override
+that choice. Custom providers must support function tools and JSON output.
+Custom endpoints disable Agents SDK tracing for that run.
 
-## Connect a local instance to the deployed server
+For DeepSeek, use `https://api.deepseek.com` with `deepseek-v4-flash` or
+`deepseek-v4-pro`. The retired `deepseek-chat` and `deepseek-reasoner` names are
+rejected with an actionable configuration error.
 
-On the deployed server, set:
+Then start Flask and open `http://127.0.0.1:5050`:
+
+```bash
+python app.py
+```
+
+An API key for the selected model provider is required because tool selection
+and the final diagnosis are both performed by the Agent. The key and other secrets can also be added from
+the Web UI Settings page. They are written to `.env`, never returned to the
+browser, and never stored in SQLite.
+
+The target and selected diagnostic evidence are sent to the configured model
+provider because they are required for Agent reasoning. Separate Agents SDK
+trace spans are configured not to include that sensitive content.
+
+## Frontend development
+
+The production frontend is committed in `static/frontend/`, so Node.js is not
+required to run the application. To modify the UI, use a second terminal:
+
+```bash
+npm install
+npm run dev
+```
+
+Keep Flask on port 5050 and open `http://127.0.0.1:5173`. Vite proxies API calls
+to Flask. Rebuild committed production assets after a UI change:
+
+```bash
+npm run build
+```
+
+## Tests
+
+The unit tests mock model and network boundaries, so they do not require an API
+key or a particular public website:
+
+```bash
+python -m unittest discover -s tests
+```
+
+## Settings and remote execution
+
+The Settings page defines the current Flask process as either:
+
+- **Deployed Remote Server:** Remote Test executes on this process.
+- **Local Device:** Local Test executes here; Remote Test calls the configured
+  deployed ServicePath URL.
+
+For a public remote server, configure both values below. Use the same API token
+on the local instance that calls it:
 
 ```text
 SERVICEPATH_API_TOKEN=choose-a-long-random-token
 SETTINGS_PASSWORD=choose-a-strong-password
 ```
 
-On the user's computer, start ServicePath, open Settings, select **Local Device**, and enter the deployed URL. Set the same token in the local `.env`:
-
-```text
-SERVICEPATH_API_TOKEN=choose-a-long-random-token
-```
-
-The local instance calls `POST /api/diagnose` on the deployed server. Compare Both stores the two complete reports, a five-layer side-by-side comparison, and one combined analysis in SQLite.
-
-## Course requirements completed
-
-- **Persistent data store:** SQLite reports are created and read in `database.py`.
-- **Meaningful POST:** `POST /diagnose` runs local, remote, or comparison diagnostics, analyzes the result, saves it, and redirects to a report. `POST /api/diagnose` runs remote checks.
-- **Public hosting:** deployment is supported but no live deployment is included in this repository yet.
+Each execution location needs its own Agent key, model, and optional base URL.
+The local instance sends the normalized target to `POST /api/diagnose`; it
+verifies that the returned Agent report is for that exact target before comparing
+or saving it.
 
 ## Known limitations
 
-- Console lines appear when the request finishes; they are not streamed live.
-- Traceroute requires the system `traceroute` command on macOS/Linux or `tracert` on Windows. It is skipped when unavailable, after DNS failure, or when proxy DNS returns a synthetic Fake-IP.
-- Compare Both runs Local Test and Remote Test one after the other, so it takes longer than either individual mode.
-- A deployed webpage cannot perform raw DNS, TCP, or TLS checks from a visitor's device. Local Test and Compare Both therefore require the user to start the local Flask instance.
-- When the machine running a test has a system proxy, ServicePath recognizes Fake-IP DNS in `198.18.0.0/15`. It skips misleading raw TCP/TLS checks and runs HTTP through that proxy.
-- Client Network reports local routes and proxy presence, not public IP, ISP, ASN, or location.
-- DNS uses the system resolver and does not yet compare public resolvers or query CNAME/WHOIS data.
-- SQLite requires a persistent filesystem when deployed; a temporary serverless filesystem will lose history.
-- The remote API has optional token authentication but no rate limiting. Configure a token before public deployment.
-- ServicePath blocks private/reserved targets and rechecks redirects, but production deployments should also enforce outbound network rules.
+- The browser receives the report only after the Agent run completes; tool
+  events are not streamed yet.
+- Traceroute requires `traceroute` on macOS/Linux or `tracert` on Windows and is
+  supporting evidence only because intermediate hops often ignore probes.
+- Browser JavaScript cannot perform raw DNS, TCP, or TLS checks from a visitor's
+  device. Local Test therefore requires a local ServicePath process.
+- Client Network reports routes and proxy presence, not public IP, ISP, ASN, or
+  geolocation.
+- DNS uses the system resolver and does not compare public resolvers or query
+  CNAME/WHOIS data.
+- Proxy-managed Fake-IP addresses in `198.18.0.0/15` are recognized. Raw TCP/TLS
+  checks are skipped in that case and HTTP uses the configured proxy.
+- SQLite needs persistent storage. A temporary serverless filesystem loses
+  history.
+- The remote endpoint supports bearer-token authentication but has no built-in
+  rate limiter. Put rate limits and outbound network policy in front of public
+  deployments.
