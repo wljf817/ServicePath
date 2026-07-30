@@ -1,5 +1,3 @@
-import {Button} from "@heroui/react";
-
 import {ActivityIcon, HistoryIcon, LogoMark, SettingsIcon} from "./Icons";
 
 export default function Shell({children, path, navigate}) {
@@ -30,19 +28,20 @@ export default function Shell({children, path, navigate}) {
                     <nav className="main-nav" aria-label="Primary navigation">
                         {links.map((link) => {
                             const LinkIcon = link.icon;
-                            const active = link.path === "/" ? path === "/" : path.startsWith(link.path);
+                            const active = link.path === "/"
+                                ? path === "/" || path.startsWith("/reports/")
+                                : path.startsWith(link.path);
                             return (
-                                <Button
+                                <button
                                     aria-current={active ? "page" : undefined}
                                     className={active ? "nav-button nav-button-active" : "nav-button"}
                                     key={link.path}
-                                    onPress={() => navigate(link.path)}
-                                    size="sm"
-                                    variant="ghost"
+                                    onClick={() => navigate(link.path)}
+                                    type="button"
                                 >
                                     <LinkIcon size={17} />
                                     <span>{link.label}</span>
-                                </Button>
+                                </button>
                             );
                         })}
                     </nav>
@@ -51,7 +50,13 @@ export default function Shell({children, path, navigate}) {
                 </div>
             </header>
 
-            <main className="app-content" id="main-content" tabIndex="-1">{children}</main>
+            <main
+                className={path === "/" ? "app-content app-content-dashboard" : "app-content"}
+                id="main-content"
+                tabIndex="-1"
+            >
+                {children}
+            </main>
 
             <footer className="app-footer">
                 <div className="footer-identity">

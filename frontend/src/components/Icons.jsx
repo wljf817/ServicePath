@@ -83,14 +83,14 @@ export function LogoMark({size = 22}) {
             width={size}
         >
             <path
-                d="M4 6h5a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3h5"
+                d="M4 7h5.25A2.75 2.75 0 0 1 12 9.75v4.5A2.75 2.75 0 0 0 14.75 17H20"
                 stroke="currentColor"
                 strokeLinecap="round"
+                strokeLinejoin="round"
                 strokeWidth="1.8"
             />
-            <circle cx="4" cy="6" fill="currentColor" r="2" />
-            <circle cx="12" cy="12" fill="currentColor" r="1.7" />
-            <circle cx="20" cy="18" fill="currentColor" r="2" />
+            <circle cx="4" cy="7" fill="currentColor" r="1.8" />
+            <circle cx="20" cy="17" fill="currentColor" r="1.8" />
         </svg>
     );
 }
@@ -98,8 +98,14 @@ export function LogoMark({size = 22}) {
 export function SettingsIcon(props) {
     return (
         <Icon {...props}>
-            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-            <path d="M19 13.5v-3l-2-.7-.7-1.7.9-1.9-2.1-2.1-1.9.9-1.7-.7-.7-2h-3l-.7 2-1.7.7-1.9-.9-2.1 2.1.9 1.9-.7 1.7-2 .7v3l2 .7.7 1.7-.9 1.9 2.1 2.1 1.9-.9 1.7.7.7 2h3l.7-2 1.7-.7 1.9.9 2.1-2.1-.9-1.9.7-1.7 2-.7Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.5" />
+            <path
+                d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+            />
+            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
         </Icon>
     );
 }

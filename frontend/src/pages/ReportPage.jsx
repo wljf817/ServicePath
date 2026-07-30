@@ -70,7 +70,7 @@ export default function ReportPage({reportId, navigate}) {
     const compare = report.mode === "compare";
 
     return (
-        <>
+        <div className="report-flow">
             <section className={`report-hero report-${report.status}`}>
                 <div className="report-hero-main">
                     <div>
@@ -93,6 +93,8 @@ export default function ReportPage({reportId, navigate}) {
                 </div>
             </section>
 
+            <AnalysisPanel analysis={report.analysis} />
+
             {compare ? (
                 <>
                     <section className="compare-console-grid">
@@ -108,7 +110,6 @@ export default function ReportPage({reportId, navigate}) {
                 </section>
             )}
 
-            <AnalysisPanel analysis={report.analysis} />
-        </>
+        </div>
     );
 }

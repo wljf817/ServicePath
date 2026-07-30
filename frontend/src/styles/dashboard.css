@@ -2,7 +2,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1.08fr) minmax(390px, 0.92fr);
     gap: clamp(40px, 6vw, 86px);
-    align-items: center;
+    align-items: start;
     min-height: 430px;
     margin-bottom: 42px;
 }
@@ -10,6 +10,7 @@
 .hero-copy {
     position: relative;
     z-index: 1;
+    padding-top: 20px;
 }
 
 .hero-pill,
@@ -822,6 +823,10 @@
     .dashboard-hero {
         grid-template-columns: 1fr;
         min-height: 0;
+    }
+
+    .hero-copy {
+        padding-top: 0;
     }
 
     .network-path-visual {

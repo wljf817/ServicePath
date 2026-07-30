@@ -428,8 +428,18 @@
     white-space: nowrap;
 }
 
-.report-grid {
-    margin-top: 0;
+.report-flow {
+    display: grid;
+    gap: 20px;
+    min-width: 0;
+}
+
+.report-flow > .report-hero,
+.report-flow > .analysis-panel,
+.report-flow > .report-grid,
+.report-flow > .compare-console-grid,
+.report-flow > .comparison-panel {
+    margin: 0;
 }
 
 .compare-console-grid {
