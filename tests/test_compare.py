@@ -64,6 +64,27 @@ class CompareReportsTests(unittest.TestCase):
         )
         self.assertEqual(len(result["comparison"]["layers"]), 5)
 
+    def test_compares_only_evidence_selected_at_either_location(self):
+        local_report = report()
+        remote_report = report()
+        local_report["layers"] = [
+            layer
+            for layer in local_report["layers"]
+            if layer["key"] in {"client", "dns", "http"}
+        ]
+        remote_report["layers"] = [
+            layer
+            for layer in remote_report["layers"]
+            if layer["key"] in {"client", "dns", "tcp", "http"}
+        ]
+
+        result = compare_reports(local_report, remote_report)
+
+        rows = {row["key"]: row for row in result["comparison"]["layers"]}
+        self.assertEqual(set(rows), {"client", "dns", "tcp", "http"})
+        self.assertEqual(rows["tcp"]["local"]["status"], "skipped")
+        self.assertFalse(rows["tcp"]["matches"])
+
 
 if __name__ == "__main__":
     unittest.main()

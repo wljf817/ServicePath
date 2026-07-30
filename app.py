@@ -3,9 +3,14 @@ import os
 from pathlib import Path
 
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
-from dotenv import load_dotenv, set_key
+from dotenv import dotenv_values, load_dotenv, set_key, unset_key
 
-from app_settings import SettingsError, validate_settings
+from app_settings import (
+    SettingsError,
+    validate_openai_api_mode,
+    validate_openai_base_url,
+    validate_settings,
+)
 from database import (
     get_report,
     get_settings,
@@ -14,10 +19,14 @@ from database import (
     save_report,
     update_settings,
 )
+from diagnostics.agent import (
+    AgentConfigurationError,
+    AgentRunError,
+    run_agent_diagnostics,
+)
 from diagnostics.analysis import analyze_report
 from diagnostics.execution import ExecutionError, run_selected_diagnostics
 from diagnostics.remote import RemoteError
-from diagnostics.runner import run_diagnostics
 from diagnostics.target import TargetError
 
 
@@ -87,16 +96,24 @@ def settings_authorized(supplied_password):
 
 
 def app_settings_payload():
+    agent_configured = bool(os.getenv("OPENAI_API_KEY"))
     return {
         "settings": get_settings(app.config["DATABASE"]),
         "password_required": bool(os.getenv("SETTINGS_PASSWORD")),
         "api_token_configured": bool(os.getenv("SERVICEPATH_API_TOKEN")),
-        "ai_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "agent_configured": agent_configured,
+        "ai_configured": agent_configured,
         "openai_model": os.getenv("OPENAI_MODEL", "gpt-5.6"),
+        "openai_base_url": os.getenv("OPENAI_BASE_URL", ""),
+        "openai_api_mode": os.getenv("OPENAI_API_MODE", "auto"),
     }
 
 
 def update_environment_settings(data):
+    base_url_supplied = "openai_base_url" in data
+    base_url = validate_openai_base_url(data.get("openai_base_url", ""))
+    api_mode_supplied = "openai_api_mode" in data
+    api_mode = validate_openai_api_mode(data.get("openai_api_mode", "auto"))
     values = {
         "SERVICEPATH_API_TOKEN": data.get("servicepath_api_token", ""),
         "OPENAI_API_KEY": data.get("openai_api_key", ""),
@@ -113,6 +130,26 @@ def update_environment_settings(data):
         env_path.chmod(0o600)
         set_key(str(env_path), name, value)
         os.environ[name] = value
+
+    if base_url_supplied:
+        if base_url:
+            env_path.touch(mode=0o600, exist_ok=True)
+            env_path.chmod(0o600)
+            set_key(str(env_path), "OPENAI_BASE_URL", base_url)
+            os.environ["OPENAI_BASE_URL"] = base_url
+        else:
+            if (
+                env_path.exists()
+                and "OPENAI_BASE_URL" in dotenv_values(env_path)
+            ):
+                unset_key(str(env_path), "OPENAI_BASE_URL")
+            os.environ.pop("OPENAI_BASE_URL", None)
+
+    if api_mode_supplied:
+        env_path.touch(mode=0o600, exist_ok=True)
+        env_path.chmod(0o600)
+        set_key(str(env_path), "OPENAI_API_MODE", api_mode)
+        os.environ["OPENAI_API_MODE"] = api_mode
 
 
 @app.route("/settings", methods=["GET", "POST"])
@@ -174,10 +211,10 @@ def api_app_settings():
             str(data.get("instance_role", "")),
             str(data.get("remote_service_url", "")),
         )
+        update_environment_settings(data)
     except SettingsError as error:
         return jsonify({"error": str(error)}), 400
 
-    update_environment_settings(data)
     update_settings(app.config["DATABASE"], values)
     return jsonify(app_settings_payload())
 
@@ -230,8 +267,16 @@ def diagnose():
     try:
         current_settings = get_settings(app.config["DATABASE"])
         report = run_selected_diagnostics(domain, mode, current_settings)
-    except (ExecutionError, TargetError, RemoteError) as error:
+    except (
+        AgentConfigurationError,
+        AgentRunError,
+        ExecutionError,
+        TargetError,
+        RemoteError,
+    ) as error:
         if isinstance(error, RemoteError):
+            status_code = 503
+        elif isinstance(error, (AgentConfigurationError, AgentRunError)):
             status_code = 503
         elif isinstance(error, ExecutionError):
             status_code = 409
@@ -239,7 +284,8 @@ def diagnose():
             status_code = 400
         return diagnosis_error(str(error), status_code, domain, mode)
 
-    report["analysis"] = analyze_report(report)
+    if "analysis" not in report:
+        report["analysis"] = analyze_report(report)
     report_id = save_report(app.config["DATABASE"], report)
     report_url = url_for("view_report", report_id=report_id)
 
@@ -260,14 +306,16 @@ def api_diagnose():
         if not hmac.compare_digest(supplied_token, expected_token):
             return jsonify({"error": "Unauthorized"}), 401
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify({"error": "The request body must be a JSON object."}), 400
 
     try:
-        report = run_diagnostics(data.get("target", ""), mode="remote")
+        report = run_agent_diagnostics(data.get("target", ""), mode="remote")
     except TargetError as error:
         return jsonify({"error": str(error)}), 400
+    except (AgentConfigurationError, AgentRunError) as error:
+        return jsonify({"error": str(error)}), 503
 
     return jsonify(report)
 

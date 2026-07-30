@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from app import app
 from database import get_settings, init_db, update_settings
+from diagnostics.agent import AgentConfigurationError
 from diagnostics.result import make_result
 
 
@@ -79,7 +80,10 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data["settings"]["instance_role"], "local_device")
+        self.assertIn("agent_configured", data)
         self.assertIn("ai_configured", data)
+        self.assertIn("openai_base_url", data)
+        self.assertIn("openai_api_mode", data)
 
     def test_local_request_can_update_settings(self):
         response = self.client.post(
@@ -118,6 +122,8 @@ class RouteTests(unittest.TestCase):
                 "settings_password": "",
                 "servicepath_api_token": "remote-token",
                 "openai_api_key": "openai-key",
+                "openai_base_url": "https://models.example/v1/",
+                "openai_api_mode": "chat_completions",
                 "openai_model": "gpt-test",
                 "new_settings_password": "new-password",
             },
@@ -126,15 +132,77 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertTrue(data["api_token_configured"])
+        self.assertTrue(data["agent_configured"])
         self.assertTrue(data["ai_configured"])
         self.assertTrue(data["password_required"])
         self.assertEqual(data["openai_model"], "gpt-test")
+        self.assertEqual(data["openai_base_url"], "https://models.example/v1")
+        self.assertEqual(data["openai_api_mode"], "chat_completions")
         self.assertNotIn("openai_api_key", data)
 
         env_text = Path(app.config["ENV_FILE"]).read_text()
         self.assertIn("SERVICEPATH_API_TOKEN='remote-token'", env_text)
         self.assertIn("OPENAI_API_KEY='openai-key'", env_text)
+        self.assertIn("OPENAI_BASE_URL='https://models.example/v1'", env_text)
+        self.assertIn("OPENAI_API_MODE='chat_completions'", env_text)
         self.assertIn("SETTINGS_PASSWORD='new-password'", env_text)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_frontend_settings_api_can_clear_agent_api_base_url(self):
+        common_data = {
+            "instance_role": "local_device",
+            "remote_service_url": "",
+            "settings_password": "",
+        }
+        first_response = self.client.post(
+            "/api/app-settings",
+            json={
+                **common_data,
+                "openai_base_url": "http://127.0.0.1:8000/v1",
+            },
+        )
+        self.assertEqual(first_response.status_code, 200)
+
+        second_response = self.client.post(
+            "/api/app-settings",
+            json={**common_data, "openai_base_url": ""},
+        )
+
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(second_response.get_json()["openai_base_url"], "")
+        self.assertNotIn("OPENAI_BASE_URL", os.environ)
+        self.assertNotIn(
+            "OPENAI_BASE_URL",
+            Path(app.config["ENV_FILE"]).read_text(),
+        )
+
+    def test_frontend_settings_api_rejects_invalid_agent_api_base_url(self):
+        response = self.client.post(
+            "/api/app-settings",
+            json={
+                "instance_role": "local_device",
+                "remote_service_url": "",
+                "settings_password": "",
+                "openai_base_url": "file:///tmp/model",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Base URL", response.get_json()["error"])
+
+    def test_frontend_settings_api_rejects_invalid_agent_api_mode(self):
+        response = self.client.post(
+            "/api/app-settings",
+            json={
+                "instance_role": "local_device",
+                "remote_service_url": "",
+                "settings_password": "",
+                "openai_api_mode": "legacy_completions",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("protocol", response.get_json()["error"])
 
     @patch.dict(os.environ, {"SETTINGS_PASSWORD": "admin-secret"}, clear=True)
     def test_settings_reject_wrong_password(self):
@@ -258,6 +326,35 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertRegex(response.get_json()["report_url"], r"^/reports/\d+$")
 
+    @patch("app.run_selected_diagnostics")
+    @patch("app.analyze_report")
+    def test_agent_analysis_is_saved_without_legacy_reanalysis(
+        self,
+        analyze_report,
+        run_selected,
+    ):
+        agent_report = sample_report()
+        agent_report["analysis"] = {
+            "source": "agent",
+            "headline": "The target is reachable",
+            "text": "HTTP returned 200.",
+        }
+        run_selected.return_value = agent_report
+
+        response = self.client.post(
+            "/diagnose",
+            data={"domain": "example.com", "mode": "local"},
+            headers={"Accept": "application/json"},
+        )
+
+        report_url = response.get_json()["report_url"].replace(
+            "/reports/",
+            "/api/reports/",
+        )
+        saved_report = self.client.get(report_url).get_json()
+        self.assertEqual(saved_report["analysis"]["source"], "agent")
+        analyze_report.assert_not_called()
+
     def test_async_diagnosis_returns_json_error(self):
         response = self.client.post(
             "/diagnose",
@@ -361,17 +458,31 @@ class RouteTests(unittest.TestCase):
             {"instance_role": "remote_server", "remote_service_url": ""},
         )
 
-    @patch("app.run_diagnostics")
-    def test_api_returns_remote_report(self, run_diagnostics):
+    @patch("app.run_agent_diagnostics")
+    def test_api_returns_remote_report(self, run_agent):
         remote_report = sample_report()
         remote_report["mode"] = "remote"
-        run_diagnostics.return_value = remote_report
+        run_agent.return_value = remote_report
 
         response = self.client.post("/api/diagnose", json={"target": "example.com"})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["mode"], "remote")
-        run_diagnostics.assert_called_once_with("example.com", mode="remote")
+        run_agent.assert_called_once_with("example.com", mode="remote")
+
+    @patch("app.run_agent_diagnostics")
+    def test_api_returns_service_unavailable_when_agent_is_not_configured(
+        self,
+        run_agent,
+    ):
+        run_agent.side_effect = AgentConfigurationError(
+            "Agent diagnostics require an OpenAI API key in Settings."
+        )
+
+        response = self.client.post("/api/diagnose", json={"target": "example.com"})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("OpenAI API key", response.get_json()["error"])
 
     @patch.dict(os.environ, {"SERVICEPATH_API_TOKEN": "secret-token"}, clear=True)
     def test_api_rejects_wrong_token(self):

@@ -20,6 +20,17 @@ def remote_report():
             make_result(key, name, "passed", "Passed")
             for key, name in zip(keys, names)
         ],
+        "analysis": {
+            "source": "agent",
+            "headline": "Target is reachable",
+        },
+        "agent": {
+            "model": "gpt-test",
+            "checks_used": 5,
+            "max_checks": 6,
+            "requested_tools": [],
+            "tool_log": [],
+        },
     }
 
 
@@ -48,9 +59,9 @@ class RemoteDiagnosticTests(unittest.TestCase):
         self.assertEqual(report["mode"], "remote")
         post.assert_called_once_with(
             "https://servicepath.example/api/diagnose",
-            json={"target": "example.com"},
+            json={"target": "https://example.com/"},
             headers={"Authorization": "Bearer secret-token"},
-            timeout=45,
+            timeout=120,
         )
 
     @patch("diagnostics.remote.requests.post")
@@ -82,6 +93,53 @@ class RemoteDiagnosticTests(unittest.TestCase):
         post.return_value = response
 
         with self.assertRaises(RemoteError):
+            run_remote_diagnostics("example.com")
+
+    @patch("diagnostics.remote.requests.post")
+    @patch.dict(
+        os.environ,
+        {"REMOTE_SERVICE_URL": "https://servicepath.example"},
+        clear=True,
+    )
+    def test_rejects_malformed_adaptive_evidence(self, post):
+        response = Mock()
+        response.json.return_value = remote_report()
+        response.json.return_value["layers"][0]["details"] = "not-an-object"
+        post.return_value = response
+
+        with self.assertRaisesRegex(RemoteError, "invalid layer"):
+            run_remote_diagnostics("example.com")
+
+    @patch("diagnostics.remote.requests.post")
+    @patch.dict(
+        os.environ,
+        {"REMOTE_SERVICE_URL": "https://servicepath.example"},
+        clear=True,
+    )
+    def test_rejects_report_for_a_different_target(self, post):
+        response = Mock()
+        response.json.return_value = remote_report()
+        response.json.return_value["target"]["url"] = "https://other.example/"
+        post.return_value = response
+
+        with self.assertRaisesRegex(RemoteError, "does not match"):
+            run_remote_diagnostics("example.com")
+
+    @patch("diagnostics.remote.requests.post")
+    @patch.dict(
+        os.environ,
+        {"REMOTE_SERVICE_URL": "https://servicepath.example"},
+        clear=True,
+    )
+    def test_surfaces_safe_remote_agent_error(self, post):
+        response = Mock()
+        response.ok = False
+        response.json.return_value = {
+            "error": "Agent diagnostics require an OpenAI API key in Settings."
+        }
+        post.return_value = response
+
+        with self.assertRaisesRegex(RemoteError, "OpenAI API key"):
             run_remote_diagnostics("example.com")
 
 
