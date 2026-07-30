@@ -40,8 +40,8 @@ document.addEventListener("submit", async function (event) {
     const button = form.querySelector("#submit-button");
     const consoleOutput = document.querySelector("#console-output");
     button.disabled = true;
-    button.textContent = "Running checks...";
-    showConsoleMessage(consoleOutput, "INFO", "info", "Starting diagnostics...");
+    button.textContent = "Agent investigating...";
+    showConsoleMessage(consoleOutput, "AGENT", "info", "Selecting diagnostic tools...");
 
     try {
         const response = await fetch(form.action, {
@@ -59,7 +59,7 @@ document.addEventListener("submit", async function (event) {
     } catch (error) {
         showConsoleMessage(consoleOutput, "ERROR", "error", error.message);
         button.disabled = false;
-        button.textContent = "Start diagnosis";
+        button.textContent = "Start investigation";
     }
 });
 

@@ -30,12 +30,12 @@ function CompareTable({report}) {
             <Card.Header>
                 <div>
                     <span className="section-kicker">SIDE BY SIDE</span>
-                    <Card.Title>Layer comparison</Card.Title>
+                    <Card.Title>Evidence comparison</Card.Title>
                 </div>
             </Card.Header>
             <Card.Content>
                 <div className="comparison-table">
-                    <div className="comparison-head"><span>Layer</span><span>Local</span><span>Remote</span></div>
+                    <div className="comparison-head"><span>Check</span><span>Local</span><span>Remote</span></div>
                     {report.comparison.layers.map((row) => (
                         <div className="comparison-row" key={row.key}>
                             <strong>{row.name}</strong>
@@ -75,7 +75,7 @@ export default function ReportPage({reportId, navigate}) {
                 <div className="report-hero-main">
                     <div>
                         <span className="section-kicker">DIAGNOSTIC REPORT · #{report.id}</span>
-                        <h1>{compare ? report.comparison.title : report.target.hostname}</h1>
+                        <h1>{compare ? report.comparison.title : report.analysis?.headline || report.target.hostname}</h1>
                         <p>{compare ? report.comparison.summary : report.target.url}</p>
                     </div>
                     <div className="report-actions">
@@ -87,7 +87,7 @@ export default function ReportPage({reportId, navigate}) {
                 </div>
                 <div className="report-metrics" aria-label="Report summary">
                     <ReportMetric label="Duration" value={`${report.duration_ms} ms`} />
-                    <ReportMetric label="First issue" value={report.first_problem?.toUpperCase() || "None found"} />
+                    <ReportMetric label="Observed break" value={report.first_problem?.toUpperCase() || "None found"} />
                     <ReportMetric label="Run location" value={compare ? "Local + remote" : report.mode} />
                     <ReportMetric label="Completed" value={formatDate(report.created_at)} />
                 </div>
@@ -96,8 +96,8 @@ export default function ReportPage({reportId, navigate}) {
             {compare ? (
                 <>
                     <section className="compare-console-grid">
-                        <DiagnosticConsole label="Local Test" report={report.local_report} />
-                        <DiagnosticConsole label="Remote Test" report={report.remote_report} />
+                        <DiagnosticConsole label="Local Agent Evidence" report={report.local_report} />
+                        <DiagnosticConsole label="Remote Agent Evidence" report={report.remote_report} />
                     </section>
                     <CompareTable report={report} />
                 </>

@@ -2,6 +2,20 @@
     {% if show_header %}
         <p><span class="info">[INFO]</span> Target: {{ test_report.target.url }}</p>
         <p><span class="info">[INFO]</span> Mode: {{ test_report.mode|title }} Test</p>
+        {% if test_report.agent %}
+            <p><span class="return">[AGENT]</span> Model: {{ test_report.agent.model }}</p>
+            <p>
+                <span class="return">[BUDGET]</span>
+                {{ test_report.agent.checks_used }} / {{ test_report.agent.max_checks }} checks used
+            </p>
+            {% if test_report.agent.model_calls %}
+                <p>
+                    <span class="return">[USAGE]</span>
+                    {{ test_report.agent.model_calls }} model calls ·
+                    {{ test_report.agent.token_usage.total }} tokens
+                </p>
+            {% endif %}
+        {% endif %}
     {% endif %}
 
     {% for layer in test_report.layers %}
@@ -23,10 +37,20 @@
         {% endfor %}
         <p class="console-detail console-raw-label">
             <span class="raw-return">[RAW RETURN]</span>
-            {{ layer.name }} function result
+            {{ layer.name }} tool result
         </p>
         <pre class="console-raw">{{ layer|tojson(indent=2) }}</pre>
     {% endfor %}
+
+    {% if test_report.traceroute %}
+        {% set layer = test_report.traceroute %}
+        <p class="console-step"><span class="info">[CHECK]</span> {{ layer.name }}</p>
+        <p class="console-detail">
+            <span class="{{ layer.status }}">[{{ layer.status|upper }}]</span>
+            {{ layer.summary }}
+        </p>
+        <pre class="console-raw">{{ layer|tojson(indent=2) }}</pre>
+    {% endif %}
 
     <p class="console-done">
         <span class="info">[DONE]</span>

@@ -36,6 +36,8 @@ export default function SettingsPage({appSettings, onSaved}) {
     const [password, setPassword] = useState("");
     const [apiToken, setApiToken] = useState("");
     const [openaiKey, setOpenaiKey] = useState("");
+    const [openaiBaseUrl, setOpenaiBaseUrl] = useState("");
+    const [openaiApiMode, setOpenaiApiMode] = useState("auto");
     const [openaiModel, setOpenaiModel] = useState("gpt-5.6");
     const [newSettingsPassword, setNewSettingsPassword] = useState("");
     const [saving, setSaving] = useState(false);
@@ -46,6 +48,8 @@ export default function SettingsPage({appSettings, onSaved}) {
         if (settings) {
             setRole(settings.instance_role);
             setRemoteUrl(settings.remote_service_url);
+            setOpenaiBaseUrl(appSettings.openai_base_url || "");
+            setOpenaiApiMode(appSettings.openai_api_mode || "auto");
             setOpenaiModel(appSettings.openai_model);
         }
     }, [appSettings, settings]);
@@ -63,6 +67,8 @@ export default function SettingsPage({appSettings, onSaved}) {
                 settings_password: password,
                 servicepath_api_token: apiToken,
                 openai_api_key: openaiKey,
+                openai_base_url: openaiBaseUrl,
+                openai_api_mode: openaiApiMode,
                 openai_model: openaiModel,
                 new_settings_password: newSettingsPassword,
             });
@@ -144,9 +150,9 @@ export default function SettingsPage({appSettings, onSaved}) {
                             ready={appSettings.api_token_configured}
                         />
                         <ConfigurationStatus
-                            description="Enables generated diagnosis and repair advice."
-                            label="OpenAI analysis"
-                            ready={appSettings.ai_configured}
+                            description="Required for autonomous tool selection and diagnosis."
+                            label="Diagnostic agent"
+                            ready={appSettings.agent_configured ?? appSettings.ai_configured}
                         />
                         <ConfigurationStatus
                             description="Protects setting changes on a public server."
@@ -172,10 +178,10 @@ export default function SettingsPage({appSettings, onSaved}) {
                         <div className="settings-secret-group">
                             <div className="settings-subheading">
                                 <span className="settings-subheading-icon settings-ai-icon">AI</span>
-                                <div><strong>AI analysis</strong><small>Generate explanations and practical next steps.</small></div>
+                                <div><strong>Diagnostic agent</strong><small>Choose tools, evaluate evidence, and return next steps.</small></div>
                             </div>
                             <label className="settings-field">
-                                <span>OpenAI API key</span>
+                                <span>Agent API key</span>
                                 <Input
                                     onChange={(event) => setOpenaiKey(event.target.value)}
                                     placeholder="Leave blank to keep the current key"
@@ -185,7 +191,34 @@ export default function SettingsPage({appSettings, onSaved}) {
                                 />
                             </label>
                             <label className="settings-field">
-                                <span>OpenAI model</span>
+                                <span>OpenAI-compatible API base URL</span>
+                                <div>
+                                    <GlobeIcon size={17} />
+                                    <Input
+                                        onChange={(event) => setOpenaiBaseUrl(event.target.value)}
+                                        placeholder="https://api.openai.com/v1"
+                                        type="url"
+                                        value={openaiBaseUrl}
+                                        variant="secondary"
+                                    />
+                                </div>
+                                <small>Optional. Leave blank for the OpenAI default endpoint.</small>
+                            </label>
+                            <label className="settings-field">
+                                <span>Agent API protocol</span>
+                                <select
+                                    className="settings-select"
+                                    onChange={(event) => setOpenaiApiMode(event.target.value)}
+                                    value={openaiApiMode}
+                                >
+                                    <option value="auto">Auto (recommended)</option>
+                                    <option value="responses">Responses API</option>
+                                    <option value="chat_completions">Chat Completions</option>
+                                </select>
+                                <small>Auto uses Responses for OpenAI and Chat Completions for custom URLs such as DeepSeek.</small>
+                            </label>
+                            <label className="settings-field">
+                                <span>Model name</span>
                                 <Input
                                     onChange={(event) => setOpenaiModel(event.target.value)}
                                     placeholder="gpt-5.6"
@@ -223,7 +256,8 @@ export default function SettingsPage({appSettings, onSaved}) {
                         </div>
                         <p className="security-copy">
                             New secrets are written to the server <code>.env</code> file.
-                            Existing values are never returned to this page or saved in SQLite.
+                            Existing secret values are never returned to this page or saved in SQLite.
+                            The non-secret API base URL is shown so it can be edited or cleared.
                         </p>
                     </Card.Content>
                 </Card>

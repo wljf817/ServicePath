@@ -30,7 +30,7 @@ export default function HistoryPage({navigate}) {
                 <div>
                     <span className="hero-pill"><HistoryIcon size={15} /> Saved reports</span>
                     <h1>Diagnostic history</h1>
-                    <p>Every completed trace stays available with its raw returns and analysis.</p>
+                    <p>Every investigation keeps its agent conclusion and supporting tool evidence.</p>
                 </div>
                 <Button className="page-action-button" onPress={() => navigate("/")} variant="primary">
                     New diagnosis <ArrowIcon size={16} />

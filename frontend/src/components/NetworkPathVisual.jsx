@@ -16,12 +16,12 @@ export default function NetworkPathVisual({loading = false}) {
         <section className={visualClass} aria-labelledby="network-path-title">
             <div className="network-path-heading">
                 <div>
-                    <span className="network-path-kicker">REQUEST PATH</span>
-                    <h2 id="network-path-title">Follow every connection layer</h2>
+                    <span className="network-path-kicker">AVAILABLE EVIDENCE</span>
+                    <h2 id="network-path-title">The agent chooses what to inspect</h2>
                 </div>
                 <span className="network-path-state">
                     <i aria-hidden="true" />
-                    {loading ? "Diagnostics running" : "Ready to trace"}
+                    {loading ? "Agent investigating" : "Tools ready"}
                 </span>
             </div>
 

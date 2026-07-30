@@ -33,12 +33,12 @@
         </section>
 
         <section class="compare-consoles">
-            {% for label, test_report in [('Local Test', report.local_report), ('Remote Test', report.remote_report)] %}
+            {% for label, test_report in [('Local Agent Evidence', report.local_report), ('Remote Agent Evidence', report.remote_report)] %}
                 <div class="console-card">
                     <div class="card-heading">
                         <div>
                             <p class="eyebrow">{{ label|upper }}</p>
-                            <h2>Diagnostic Console</h2>
+                            <h2>Agent Tool Evidence</h2>
                         </div>
                         <span class="console-dot"></span>
                     </div>
@@ -53,13 +53,13 @@
             <div class="card-heading">
                 <div>
                     <p class="eyebrow">SIDE-BY-SIDE</p>
-                    <h2>Layer comparison</h2>
+                    <h2>Evidence comparison</h2>
                 </div>
             </div>
 
             <div class="comparison-table">
                 <div class="comparison-heading">
-                    <strong>Layer</strong>
+                    <strong>Check</strong>
                     <strong>Local Test</strong>
                     <strong>Remote Test</strong>
                 </div>

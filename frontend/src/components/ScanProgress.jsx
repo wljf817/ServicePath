@@ -1,13 +1,11 @@
 import {useEffect, useState} from "react";
 
 const checkLabels = [
-    "client network details",
-    "DNS resolution",
-    "network route",
-    "TCP connections",
-    "TLS security",
-    "HTTP response",
-    "diagnostic results",
+    "planning the next useful check",
+    "running a bounded network tool",
+    "reviewing returned evidence",
+    "deciding whether more evidence is needed",
+    "preparing the final diagnosis",
 ];
 
 const modeLabels = {
@@ -53,7 +51,7 @@ export default function ScanProgress({loading, mode}) {
                     aria-atomic="true"
                     aria-live="polite"
                 >
-                    Currently checking {currentCheck}
+                    Agent is {currentCheck}
                 </p>
             </div>
 

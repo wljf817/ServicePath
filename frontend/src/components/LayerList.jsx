@@ -3,7 +3,7 @@ import {Card} from "@heroui/react";
 import {ChevronIcon, ClockIcon} from "./Icons";
 import StatusBadge from "./StatusBadge";
 
-const waitingLayers = [
+const availableTools = [
     {key: "client", name: "Client Network"},
     {key: "dns", name: "DNS"},
     {key: "traceroute", name: "Traceroute"},
@@ -39,15 +39,15 @@ function detailLines(value, prefix = "") {
 
 export default function LayerList({report}) {
     const layers = report
-        ? report.layers.flatMap((layer) => (
+        ? (report.layers || []).flatMap((layer) => (
             layer.key === "dns" && report.traceroute
                 ? [layer, report.traceroute]
                 : [layer]
         ))
-        : waitingLayers.map((layer) => ({
+        : availableTools.map((layer) => ({
             ...layer,
             status: "waiting",
-            summary: "Waiting to run",
+            summary: "Available to the diagnostic agent",
             duration_ms: 0,
         }));
     const firstIssueIndex = layers.findIndex((layer) => (
@@ -58,8 +58,8 @@ export default function LayerList({report}) {
         <Card className="layers-panel" variant="secondary">
             <Card.Header className="panel-header">
                 <div>
-                    <span className="section-kicker">FIVE LAYERS + ROUTE TRACE</span>
-                    <Card.Title className="panel-title">Path overview</Card.Title>
+                    <span className="section-kicker">ADAPTIVE TOOL SELECTION</span>
+                    <Card.Title className="panel-title">Collected evidence</Card.Title>
                 </div>
             </Card.Header>
             <Card.Content className="layer-stack">

@@ -123,7 +123,7 @@
 .settings-panel > header,
 .configuration-panel > header,
 .comparison-panel > header,
-.analysis-panel > header {
+.analysis-header {
     min-height: 77px;
     padding: 17px 21px !important;
     border-bottom: 1px solid rgba(148, 163, 184, 0.11);
@@ -505,28 +505,47 @@
     content: "";
 }
 
-.analysis-panel > header {
+.analysis-header {
     display: flex !important;
     flex-direction: row !important;
     gap: 13px;
     align-items: center !important;
 }
 
+.analysis-header > div {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.analysis-header h3 {
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
 .analysis-panel .section-kicker {
     color: #b8a2ff;
 }
 
-.analysis-panel > div {
+.analysis-content {
     padding: 22px !important;
 }
 
 .ai-mark {
+    display: inline-flex;
+    flex: 0 0 42px;
+    justify-content: center;
+    align-items: center;
     width: 42px;
     height: 42px;
     border-color: rgba(170, 140, 255, 0.32);
     border-radius: 12px;
     background: rgba(170, 140, 255, 0.1);
     color: #c5b5ff;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+    font-weight: 760;
+    line-height: 1;
+    letter-spacing: 0.04em;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
@@ -535,6 +554,24 @@
 .empty-copy {
     color: #7e8da3;
     font-size: 11px;
+}
+
+.analysis-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.analysis-meta span {
+    padding: 5px 8px;
+    border: 1px solid rgba(170, 140, 255, 0.16);
+    border-radius: 999px;
+    background: rgba(170, 140, 255, 0.055);
+    color: #9c8fc9;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
 .analysis-text {
@@ -549,6 +586,42 @@
 .analysis-panel h3 {
     color: #9eabc0;
     font-size: 10px;
+}
+
+.analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.analysis-grid section {
+    padding: 15px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    border-radius: 11px;
+    background: rgba(6, 11, 19, 0.34);
+}
+
+.analysis-grid h3 {
+    margin: 0 0 10px;
+    color: #aeb9ca;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.analysis-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0 0 0 16px;
+    color: #8392a7;
+    font-size: 10px;
+    line-height: 1.6;
+}
+
+.analysis-grid .empty-copy {
+    margin: 0;
+    line-height: 1.6;
 }
 
 .issue-stack {
@@ -573,6 +646,12 @@
 .issue-row p {
     color: #74849a;
     font-size: 10px;
+}
+
+@media (max-width: 800px) {
+    .analysis-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .state-card {
@@ -777,6 +856,28 @@
 .settings-field input:focus {
     border-color: rgba(110, 168, 254, 0.5) !important;
     box-shadow: 0 0 0 3px rgba(110, 168, 254, 0.08) !important;
+}
+
+.settings-select {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 36px 0 13px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 11px;
+    appearance: none;
+    background:
+        linear-gradient(45deg, transparent 50%, #718197 50%) calc(100% - 16px) 19px / 5px 5px no-repeat,
+        linear-gradient(135deg, #718197 50%, transparent 50%) calc(100% - 11px) 19px / 5px 5px no-repeat,
+        rgba(6, 11, 19, 0.66);
+    color: #e1e9f5;
+    font: inherit;
+    font-size: 11px;
+}
+
+.settings-select:focus {
+    border-color: rgba(110, 168, 254, 0.5);
+    outline: 0;
+    box-shadow: 0 0 0 3px rgba(110, 168, 254, 0.08);
 }
 
 .settings-field small {

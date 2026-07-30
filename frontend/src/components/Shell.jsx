@@ -61,7 +61,7 @@ export default function Shell({children, path, navigate}) {
                     </span>
                 </div>
                 <div className="footer-meta" aria-label="Application details">
-                    <span>Five-layer diagnostics</span>
+                    <span>Single-agent diagnostics</span>
                     <i aria-hidden="true" />
                     <span>Flask + React</span>
                 </div>

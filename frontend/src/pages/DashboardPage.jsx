@@ -20,6 +20,11 @@ export default function DashboardPage({appSettings, navigate}) {
     const [mode, setMode] = useState("remote");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const requiresLocalAgent = role === "remote_server" || mode !== "remote";
+    const agentConfigured = appSettings?.agent_configured ?? appSettings?.ai_configured;
+    const agentUnavailable = Boolean(
+        appSettings && requiresLocalAgent && !agentConfigured,
+    );
 
     useEffect(() => {
         setMode(role === "remote_server" ? "remote" : "local");
@@ -47,17 +52,17 @@ export default function DashboardPage({appSettings, navigate}) {
         <>
             <section className="hero-section dashboard-hero">
                 <div className="hero-copy">
-                    <span className="hero-pill"><i /> Network observability, simplified</span>
-                    <h1>See exactly where a <span>connection breaks.</span></h1>
+                    <span className="hero-pill"><i /> Agent-guided website diagnostics</span>
+                    <h1>Let one agent investigate <span>what actually failed.</span></h1>
                     <p>
-                        Trace a request from the client to the application. ServicePath
-                        captures every return, identifies the first unhealthy layer, and
-                        prepares the evidence for AI analysis.
+                        Give ServicePath a public website. Its bounded diagnostic agent
+                        chooses the useful network tools, follows the returned evidence,
+                        and explains what the results support.
                     </p>
                     <div className="hero-facts" aria-label="ServicePath capabilities">
-                        <span><strong>05</strong> diagnostic layers</span>
-                        <span><strong>RAW</strong> return data</span>
-                        <span><strong>AI</strong> guided analysis</span>
+                        <span><strong>01</strong> diagnostic agent</span>
+                        <span><strong>06</strong> bounded tools</span>
+                        <span><strong>RAW</strong> evidence retained</span>
                     </div>
                 </div>
                 <NetworkPathVisual loading={loading} />
@@ -70,7 +75,7 @@ export default function DashboardPage({appSettings, navigate}) {
                             <div>
                                 <span className="section-kicker">NEW TRACE</span>
                                 <h2>Start a website diagnosis</h2>
-                                <p>Enter a public website or domain. The scan runs from the selected location.</p>
+                                <p>Enter a public website. The agent decides which checks are worth running.</p>
                             </div>
                             <span className="role-chip">
                                 {role === "remote_server" ? "Remote server" : "Local device"}
@@ -94,17 +99,22 @@ export default function DashboardPage({appSettings, navigate}) {
                             </div>
                             <Button
                                 className="start-button"
-                                isDisabled={loading}
+                                isDisabled={loading || agentUnavailable}
                                 isPending={loading}
                                 size="lg"
                                 type="submit"
                                 variant="primary"
                             >
                                 {loading ? <Spinner color="current" size="sm" /> : <ArrowIcon size={19} />}
-                                {loading ? "Running checks" : "Start diagnosis"}
+                                {loading ? "Agent investigating" : "Start investigation"}
                             </Button>
                         </div>
 
+                        {agentUnavailable && (
+                            <p className="form-error" role="alert">
+                                The diagnostic agent needs an API key. Configure it in Settings before running this location.
+                            </p>
+                        )}
                         {error && <p className="form-error" role="alert">{error}</p>}
 
                         <fieldset className="mode-fieldset">
