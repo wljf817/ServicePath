@@ -8,26 +8,6 @@ function showConsoleMessage(consoleOutput, label, className, message) {
     consoleOutput.replaceChildren(line);
 }
 
-async function loadReport(reportUrl) {
-    const response = await fetch(reportUrl);
-
-    if (!response.ok) {
-        throw new Error("The completed report could not be loaded.");
-    }
-
-    const html = await response.text();
-    const reportPage = new DOMParser().parseFromString(html, "text/html");
-    const newMain = reportPage.querySelector("main");
-
-    if (!newMain) {
-        throw new Error("The server returned an invalid report page.");
-    }
-
-    document.querySelector("main").replaceWith(newMain);
-    document.title = reportPage.title;
-    window.history.pushState({}, "", reportUrl);
-}
-
 document.addEventListener("submit", async function (event) {
     const form = event.target;
 
@@ -55,14 +35,10 @@ document.addEventListener("submit", async function (event) {
             throw new Error(data.error || "The diagnosis could not be completed.");
         }
 
-        await loadReport(data.report_url);
+        window.location.assign(data.report_url);
     } catch (error) {
         showConsoleMessage(consoleOutput, "ERROR", "error", error.message);
         button.disabled = false;
         button.textContent = "Start investigation";
     }
-});
-
-window.addEventListener("popstate", function () {
-    window.location.reload();
 });
