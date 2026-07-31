@@ -40,7 +40,6 @@ class DiagnosticContext:
     """
 
     target: dict
-    mode: str
     event_handler: Callable[[dict], None] | None = None
     results: dict[str, dict] = field(default_factory=dict)
     tool_log: list[dict] = field(default_factory=list)

@@ -1,4 +1,3 @@
-import os
 from datetime import datetime, timezone
 from time import perf_counter
 from urllib.parse import urlsplit
@@ -22,11 +21,6 @@ from openai import (
     RateLimitError,
 )
 
-from servicepath.settings import (
-    SettingsError,
-    validate_openai_api_mode,
-    validate_openai_base_url,
-)
 from diagnostics.agent_models import AgentDiagnosis
 from diagnostics.agent_tools import AGENT_TOOLS, CHECK_ORDER, DiagnosticContext
 from diagnostics.target import normalize_target
@@ -73,10 +67,6 @@ high. evidence, likely_causes, and actions must be JSON arrays of concise
 strings.
 """.strip()
 
-class AgentConfigurationError(RuntimeError):
-    """Raised when agent diagnostics are not configured."""
-
-
 class AgentRunError(RuntimeError):
     """Raised when the diagnostic agent cannot complete a run."""
 
@@ -115,7 +105,6 @@ def _analysis_payload(diagnosis, model, context):
 
 def _build_report(
     target,
-    mode,
     model,
     api_mode,
     diagnosis,
@@ -134,7 +123,6 @@ def _build_report(
 
     return {
         "target": target,
-        "mode": mode,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "duration_ms": duration_ms,
         "status": _report_status(diagnosis.verdict),
@@ -149,13 +137,6 @@ def _build_report(
             "tool_log": context.tool_log,
         },
     }
-
-
-def _resolve_api_mode():
-    value = os.getenv("OPENAI_API_MODE")
-    return validate_openai_api_mode(
-        "responses" if value is None else value
-    )
 
 
 def _provider_extra_body(base_url, api_mode):
@@ -304,29 +285,17 @@ def _diagnosis_is_supported(diagnosis, context):
 
 def run_agent_diagnostics(
     value,
-    mode="server",
+    provider,
     max_turns=8,
     event_handler=None,
 ):
     """Let one bounded Agents SDK agent investigate a locked website target."""
     target = normalize_target(value)
 
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        raise AgentConfigurationError(
-            "Agent diagnostics require an API key in Settings."
-        )
-
-    try:
-        base_url = validate_openai_base_url(os.getenv("OPENAI_BASE_URL", ""))
-        api_mode = _resolve_api_mode()
-    except SettingsError as error:
-        raise AgentConfigurationError(str(error)) from error
-
-    configured_model = os.getenv("OPENAI_MODEL")
-    model = "gpt-5.6" if configured_model is None else configured_model.strip()
-    if not model:
-        raise AgentConfigurationError("Agent model name cannot be empty.")
+    api_key = provider["api_key"]
+    base_url = provider["base_url"]
+    api_mode = provider["api_mode"]
+    model = provider["model"]
 
     use_responses = api_mode == "responses"
     model_provider = OpenAIProvider(
@@ -337,7 +306,6 @@ def run_agent_diagnostics(
     )
     context = DiagnosticContext(
         target=target,
-        mode=mode,
         event_handler=event_handler,
     )
     agent = Agent[DiagnosticContext](
@@ -404,7 +372,6 @@ def run_agent_diagnostics(
     duration_ms = round((perf_counter() - started) * 1000)
     return _build_report(
         target,
-        mode,
         model,
         api_mode,
         diagnosis,
