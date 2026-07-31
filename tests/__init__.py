@@ -1,1 +1,0 @@
-"""ServicePath test package."""

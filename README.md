@@ -91,6 +91,10 @@ The container runs Gunicorn as an unprivileged user with a read-only root
 filesystem, dropped Linux capabilities, and a `/healthz` readiness check. The
 safe default publishes port 5050 only on `127.0.0.1`.
 
+Change the host interface with `SERVICEPATH_BIND_ADDRESS` and the published port
+with `SERVICEPATH_PORT`. Keep the loopback default unless a trusted reverse
+proxy or another deliberate network boundary handles controlled external access.
+
 On the first start of a new volume, selected container variables are written to
 the private `/data/.env`. That persistent copy becomes authoritative, so
 changes made in Settings survive container replacement and are not overwritten
@@ -145,14 +149,7 @@ changed, or cleared.
 
 ## Development
 
-Run the offline backend tests:
-
-```bash
-python -m unittest discover -s tests
-```
-
-The suite mocks model and public-network boundaries, so it needs no real API
-key or public target. For frontend work:
+For frontend work:
 
 ```bash
 npm ci
