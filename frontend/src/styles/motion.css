@@ -95,7 +95,7 @@ html { scroll-behavior: smooth; }
     animation: motion-enter var(--motion-duration-enter) var(--motion-ease-enter) both;
     animation-delay: calc(var(--motion-index, 0) * var(--motion-stagger));
 }
-.terminal-raw-block, .layer-details[open] .layer-return-list {
+.layer-details[open] .layer-return-list {
     --motion-enter-y: -4px;
     animation: motion-enter var(--motion-duration-base) var(--motion-ease-enter) both;
 }
@@ -129,33 +129,4 @@ html { scroll-behavior: smooth; }
 
 @keyframes motion-cursor {
     50% { opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    #root *, #root *::before, #root *::after {
-        animation: none;
-        animation-delay: 0s;
-        transition: none;
-    }
-    #root .brand:hover .brand-mark,
-    #root .nav-button:hover,
-    #root .network-path-stage:hover,
-    #root .start-button:hover:not([disabled]),
-    #root .start-button:active:not([disabled]),
-    #root .secondary-button:hover:not(:disabled),
-    #root .secondary-button:active:not(:disabled),
-    #root .inline-action:hover:not(:disabled),
-    #root .inline-action:active:not(:disabled),
-    #root .console-action:hover:not(:disabled),
-    #root .console-action:active:not(:disabled),
-    #root .page-action-button:hover,
-    #root .page-action-button:active:not(:disabled),
-    #root .history-row:hover,
-    #root .history-row:hover .history-arrow,
-    #root .save-button:hover:not(:disabled),
-    #root .save-button:active:not(:disabled) {
-        transform: none;
-    }
-    #root .history-row::before, #root .network-path-visual, #root .network-path-visual:hover { transform: none; }
 }

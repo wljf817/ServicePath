@@ -13,22 +13,26 @@ function requestError(message, status) {
     return error;
 }
 
+async function responseJson(response, invalidMessage) {
+    const text = await response.text();
+    if (!text) {
+        return {};
+    }
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw requestError(invalidMessage, response.status);
+    }
+}
+
 async function request(url, options = {}) {
     const response = await fetch(url, options);
-    const responseText = await response.text();
-    let data = {};
-
-    // Read the body once so HTML and empty error responses remain understandable.
-    if (responseText) {
-        try {
-            data = JSON.parse(responseText);
-        } catch {
-            const message = response.ok
-                ? "The server returned an invalid response."
-                : `The request failed with status ${response.status}.`;
-            throw requestError(message, response.status);
-        }
-    }
+    const data = await responseJson(
+        response,
+        response.ok
+            ? "The server returned an invalid response."
+            : `The request failed with status ${response.status}.`,
+    );
 
     if (!response.ok) {
         throw requestError(getErrorMessage(data, response), response.status);
@@ -53,18 +57,10 @@ function parseStreamEvent(line) {
 async function streamRequest(url, options, onEvent) {
     const response = await fetch(url, options);
     if (!response.ok) {
-        const responseText = await response.text();
-        let data = {};
-        if (responseText) {
-            try {
-                data = JSON.parse(responseText);
-            } catch {
-                throw requestError(
-                    `The request failed with status ${response.status}.`,
-                    response.status,
-                );
-            }
-        }
+        const data = await responseJson(
+            response,
+            `The request failed with status ${response.status}.`,
+        );
         throw requestError(getErrorMessage(data, response), response.status);
     }
     if (!response.body) {

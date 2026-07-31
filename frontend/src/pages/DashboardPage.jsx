@@ -28,22 +28,13 @@ export default function DashboardPage({
     const runState = diagnosis.status === "complete" ? "idle" : diagnosis.status;
     const error = diagnosis.error;
     const loading = runState === "running";
-    const providerConfigured = Boolean(
-        appSettings
-        && (
-            (
-                appSettings.provider_type === "preset"
-                && appSettings.presets.some(
-                    (preset) => preset.id === appSettings.preset_id
-                )
-            )
-            || (
-                appSettings.provider_type === "custom"
-                && appSettings.openai_api_key
-                && appSettings.openai_model
-            )
-        )
-    );
+    const providerConfigured = appSettings?.provider_type === "preset"
+        ? appSettings.presets.some((preset) => preset.id === appSettings.preset_id)
+        : Boolean(
+            appSettings?.provider_type === "custom"
+            && appSettings.openai_api_key
+            && appSettings.openai_model
+        );
     const customServerConfigured = Boolean(
         appSettings?.custom_server_url && appSettings?.custom_server_token
     );

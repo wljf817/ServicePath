@@ -23,11 +23,6 @@
     background: rgba(110, 168, 254, 0.07);
     color: #c4d1e3;
 }
-.console-action-active {
-    border-color: rgba(110, 168, 254, 0.27);
-    background: rgba(110, 168, 254, 0.09);
-    color: var(--sp-blue-bright);
-}
 .console-actions .live-dot { margin-left: 5px; }
 .terminal-window {
     position: relative;
@@ -119,18 +114,6 @@
     content: "";
 }
 .terminal-indent { padding-left: 13px; }
-.terminal-window pre {
-    margin: 8px 0 14px 13px;
-    padding: 14px;
-    overflow-x: auto;
-    border: 1px solid rgba(148, 163, 184, 0.13);
-    border-radius: 10px;
-    background: #080e17;
-    color: #9eacc0;
-    font-size: 10px;
-    line-height: 1.58;
-    tab-size: 2;
-}
 .terminal-done {
     margin-top: 22px;
     padding: 14px 0 0 14px;
@@ -143,9 +126,6 @@
 .term-error { color: var(--sp-red); }
 .term-skipped, .term-muted { color: #637187; }
 .term-return { color: var(--sp-purple); }
-.term-raw { color: #ed9a63; }
-.raw-title { margin-top: 12px; }
-
 /* Structured tool evidence. */
 .layer-stack {
     display: grid;
@@ -318,7 +298,6 @@
 
 @media (max-width: 430px) {
     .console-action { padding-inline: 7px; font-size: 0; }
-    .console-action:first-child { display: none; }
     .console-action svg { width: 14px; height: 14px; }
     .layer-row { grid-template-columns: 35px minmax(0, 1fr); }
     .layer-row .status-badge { grid-column: 2; }

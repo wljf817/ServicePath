@@ -14,6 +14,33 @@ function StatusBadge({ready}) {
     );
 }
 
+function SettingsCard({children, description, icon, iconClass = "", ready, title}) {
+    return (
+        <Panel className="configuration-panel settings-card">
+            <Panel.Header className="settings-card-header">
+                <div className="settings-card-title">
+                    <span className={`settings-subheading-icon ${iconClass}`}>{icon}</span>
+                    <div>
+                        <Panel.Title>{title}</Panel.Title>
+                        <Panel.Description>{description}</Panel.Description>
+                    </div>
+                </div>
+                <StatusBadge ready={ready} />
+            </Panel.Header>
+            <Panel.Content>{children}</Panel.Content>
+        </Panel>
+    );
+}
+
+function SettingsField({children, hint, label, ...props}) {
+    return (
+        <label className="settings-field" {...props}>
+            <span>{label}</span>
+            {children}
+            {hint && <small>{hint}</small>}
+        </label>
+    );
+}
 
 export default function SettingsPage({
     appSettings,
@@ -37,7 +64,23 @@ export default function SettingsPage({
 
     function update(field, value) {
         setDraft((current) => ({...current, [field]: value}));
-        onChange();
+    }
+
+    function fieldProps(field) {
+        return {
+            disabled: locked,
+            onChange: (event) => update(field, event.target.value),
+            value: draft[field],
+        };
+    }
+
+    function selectProvider(event) {
+        const value = event.target.value;
+        setDraft((current) => ({
+            ...current,
+            provider_type: value === "custom" ? "custom" : "preset",
+            preset_id: value.startsWith("preset:") ? value.slice(7) : "",
+        }));
     }
 
     async function submit(event) {
@@ -73,6 +116,9 @@ export default function SettingsPage({
     const providerValue = draft.provider_type === "preset"
         ? `preset:${draft.preset_id}`
         : "custom";
+    const serverDescription = draft.server_presets.length
+        ? `${draft.server_presets.length} server preset${draft.server_presets.length === 1 ? "" : "s"} available.`
+        : "Add a private Custom Server if needed.";
 
     return (
         <>
@@ -84,133 +130,82 @@ export default function SettingsPage({
 
             <form className="settings-grid" onChange={onChange} onSubmit={submit}>
                 <div className="settings-columns">
-                    <Panel className="configuration-panel settings-card">
-                        <Panel.Header className="settings-card-header">
-                            <div className="settings-card-title">
-                                <span className="settings-subheading-icon settings-ai-icon">AI</span>
-                                <div>
-                                    <Panel.Title>Model provider</Panel.Title>
-                                    <Panel.Description>Choose a server preset or your own API.</Panel.Description>
-                                </div>
-                            </div>
-                            <StatusBadge ready={providerReady} />
-                        </Panel.Header>
-                        <Panel.Content>
-                            <label className="settings-field" htmlFor="provider-select">
-                                <span>Provider</span>
-                                <select
-                                    className="settings-select"
-                                    disabled={locked}
-                                    id="provider-select"
-                                    onChange={(event) => {
-                                        const value = event.target.value;
-                                        update("provider_type", value === "custom" ? "custom" : "preset");
-                                        update("preset_id", value.startsWith("preset:") ? value.slice(7) : "");
-                                    }}
-                                    value={providerValue}
+                    <SettingsCard
+                        description="Choose a server preset or your own API."
+                        icon="AI"
+                        iconClass="settings-ai-icon"
+                        ready={providerReady}
+                        title="Model provider"
+                    >
+                        <SettingsField htmlFor="provider-select" label="Provider">
+                            <select
+                                className="settings-select"
+                                disabled={locked}
+                                id="provider-select"
+                                onChange={selectProvider}
+                                value={providerValue}
+                            >
+                                <option value="custom">Custom OpenAI-compatible API</option>
+                                {draft.presets.map((preset) => (
+                                    <option key={preset.id} value={`preset:${preset.id}`}>
+                                        {preset.name} · {preset.model}
+                                    </option>
+                                ))}
+                            </select>
+                        </SettingsField>
+
+                        {draft.provider_type === "custom" && (
+                            <>
+                                <SettingsField label="API key">
+                                    <input autoComplete="off" type="password" {...fieldProps("openai_api_key")} />
+                                </SettingsField>
+                                <SettingsField
+                                    hint="Leave blank for OpenAI."
+                                    label="OpenAI-compatible API Base URL"
                                 >
-                                    <option value="custom">Custom OpenAI-compatible API</option>
-                                    {draft.presets.map((preset) => (
-                                        <option key={preset.id} value={`preset:${preset.id}`}>
-                                            {preset.name} · {preset.model}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
+                                    <div><GlobeIcon size={17} /><input
+                                        placeholder="https://api.deepseek.com"
+                                        type="url"
+                                        {...fieldProps("openai_base_url")}
+                                    /></div>
+                                </SettingsField>
+                                <SettingsField label="API protocol">
+                                    <select className="settings-select" {...fieldProps("openai_api_mode")}>
+                                        <option value="responses">Responses API</option>
+                                        <option value="chat_completions">Chat Completions</option>
+                                    </select>
+                                </SettingsField>
+                                <SettingsField label="Model name">
+                                    <input {...fieldProps("openai_model")} />
+                                </SettingsField>
+                            </>
+                        )}
+                    </SettingsCard>
 
-                            {draft.provider_type === "custom" && (
-                                <>
-                                    <label className="settings-field">
-                                        <span>API key</span>
-                                        <input
-                                            autoComplete="off"
-                                            disabled={locked}
-                                            onChange={(event) => update("openai_api_key", event.target.value)}
-                                            type="password"
-                                            value={draft.openai_api_key}
-                                        />
-                                    </label>
-                                    <label className="settings-field">
-                                        <span>OpenAI-compatible API Base URL</span>
-                                        <div><GlobeIcon size={17} /><input
-                                            disabled={locked}
-                                            onChange={(event) => update("openai_base_url", event.target.value)}
-                                            placeholder="https://api.deepseek.com"
-                                            type="url"
-                                            value={draft.openai_base_url}
-                                        /></div>
-                                        <small>Leave blank for OpenAI.</small>
-                                    </label>
-                                    <label className="settings-field">
-                                        <span>API protocol</span>
-                                        <select
-                                            className="settings-select"
-                                            disabled={locked}
-                                            onChange={(event) => update("openai_api_mode", event.target.value)}
-                                            value={draft.openai_api_mode}
-                                        >
-                                            <option value="responses">Responses API</option>
-                                            <option value="chat_completions">Chat Completions</option>
-                                        </select>
-                                    </label>
-                                    <label className="settings-field">
-                                        <span>Model name</span>
-                                        <input
-                                            disabled={locked}
-                                            onChange={(event) => update("openai_model", event.target.value)}
-                                            value={draft.openai_model}
-                                        />
-                                    </label>
-                                </>
-                            )}
-                        </Panel.Content>
-                    </Panel>
-
-                    <Panel className="configuration-panel settings-card">
-                        <Panel.Header className="settings-card-header">
-                            <div className="settings-card-title">
-                                <span className="settings-subheading-icon">SV</span>
-                                <div>
-                                    <Panel.Title>Remote servers</Panel.Title>
-                                    <Panel.Description>
-                                        {draft.server_presets.length
-                                            ? `${draft.server_presets.length} server preset${draft.server_presets.length === 1 ? "" : "s"} available.`
-                                            : "Add a private Custom Server if needed."}
-                                    </Panel.Description>
-                                </div>
+                    <SettingsCard
+                        description={serverDescription}
+                        icon="SV"
+                        ready={serverReady}
+                        title="Remote servers"
+                    >
+                        {draft.server_presets.length > 0 && (
+                            <div className="settings-preset-list">
+                                {draft.server_presets.map((server) => (
+                                    <p key={server.id}><strong>{server.name}</strong><span>{server.url}</span></p>
+                                ))}
                             </div>
-                            <StatusBadge ready={serverReady} />
-                        </Panel.Header>
-                        <Panel.Content>
-                            {draft.server_presets.length > 0 && (
-                                <div className="settings-preset-list">
-                                    {draft.server_presets.map((server) => (
-                                        <p key={server.id}><strong>{server.name}</strong><span>{server.url}</span></p>
-                                    ))}
-                                </div>
-                            )}
-                            <label className="settings-field">
-                                <span>Custom Server URL</span>
-                                <div><GlobeIcon size={17} /><input
-                                    disabled={locked}
-                                    onChange={(event) => update("custom_server_url", event.target.value)}
-                                    placeholder="https://servicepath.example.com"
-                                    type="url"
-                                    value={draft.custom_server_url}
-                                /></div>
-                            </label>
-                            <label className="settings-field">
-                                <span>Custom Server token</span>
-                                <input
-                                    autoComplete="off"
-                                    disabled={locked}
-                                    onChange={(event) => update("custom_server_token", event.target.value)}
-                                    type="password"
-                                    value={draft.custom_server_token}
-                                />
-                            </label>
-                        </Panel.Content>
-                    </Panel>
+                        )}
+                        <SettingsField label="Custom Server URL">
+                            <div><GlobeIcon size={17} /><input
+                                placeholder="https://servicepath.example.com"
+                                type="url"
+                                {...fieldProps("custom_server_url")}
+                            /></div>
+                        </SettingsField>
+                        <SettingsField label="Custom Server token">
+                            <input autoComplete="off" type="password" {...fieldProps("custom_server_token")} />
+                        </SettingsField>
+                    </SettingsCard>
                 </div>
 
                 <div className="settings-save-bar">

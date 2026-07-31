@@ -7,6 +7,7 @@ import DashboardPage from "./pages/DashboardPage";
 import HistoryPage from "./pages/HistoryPage";
 import ReportPage from "./pages/ReportPage";
 import SettingsPage from "./pages/SettingsPage";
+import {mergeSettings} from "./domain/settings";
 import {
     getBrowserSettings,
     saveBrowserSettings,
@@ -20,9 +21,6 @@ function currentPath() {
 export default function App() {
     const [path, setPath] = useState(currentPath());
     const [navigationCount, setNavigationCount] = useState(0);
-    const reduceMotionRef = useRef(
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    );
     const [settingsState, setSettingsState] = useState({
         data: null,
         error: "",
@@ -49,11 +47,7 @@ export default function App() {
             ([server, browser]) => {
                 if (active) {
                     setSettingsState({
-                        data: {
-                            ...browser,
-                            presets: server.presets,
-                            server_presets: server.server_presets,
-                        },
+                        data: mergeSettings(browser, server),
                         error: "",
                         status: "ready",
                     });
@@ -82,13 +76,6 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-        const update = (event) => { reduceMotionRef.current = event.matches; };
-        motionQuery.addEventListener("change", update);
-        return () => motionQuery.removeEventListener("change", update);
-    }, []);
-
-    useEffect(() => {
         const titles = {
             "/": "Diagnostics · ServicePath",
             "/history": "History · ServicePath",
@@ -112,7 +99,7 @@ export default function App() {
         setNavigationCount((count) => count + 1);
         window.scrollTo({
             top: 0,
-            behavior: reduceMotionRef.current ? "auto" : "smooth",
+            behavior: "smooth",
         });
     }, []);
 

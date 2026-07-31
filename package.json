@@ -13,6 +13,8 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "idb": "^8.0.3",
+    "lucide-react": "^1.28.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

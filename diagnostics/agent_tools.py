@@ -11,7 +11,7 @@ from diagnostics.network import check_client_network
 from diagnostics.result import skipped_result
 from diagnostics.tcp import check_tcp
 from diagnostics.tls import check_tls
-from diagnostics.traceroute import check_traceroute, skipped_traceroute
+from diagnostics.traceroute import check_traceroute
 
 
 CHECK_ORDER = ("client", "dns", "traceroute", "tcp", "tls", "http")
@@ -28,6 +28,14 @@ def _connection_addresses(dns_result):
         return [*ipv4[:2], *ipv6[:2]][:MAX_CONNECTION_ADDRESSES]
 
     return details.get("addresses", [])[:MAX_CONNECTION_ADDRESSES]
+
+
+def _dns_skip_reason(dns_result):
+    if dns_result["status"] == "error":
+        return "Skipped because DNS failed."
+    if dns_result.get("proxy_fake_ip"):
+        return "Skipped because proxy DNS returned a synthetic IP address."
+    return None
 
 
 @dataclass
@@ -70,6 +78,12 @@ class DiagnosticContext:
         )
         return result
 
+    def _skip_check(self, key, name, reason):
+        return self._run_check(
+            key,
+            lambda: skipped_result(key, name, reason),
+        )
+
     def inspect_client(self):
         return self._run_check("client", check_client_network)
 
@@ -86,61 +100,30 @@ class DiagnosticContext:
 
     def inspect_tcp(self):
         dns_result = self.inspect_dns()
-
-        if dns_result["status"] == "error":
-            operation = lambda: skipped_result(
-                "tcp",
-                "TCP",
-                "Skipped because DNS failed.",
-            )
-        elif dns_result.get("proxy_fake_ip"):
-            operation = lambda: skipped_result(
-                "tcp",
-                "TCP",
-                "Skipped because proxy DNS returned a synthetic IP address.",
-            )
-        else:
-            addresses = _connection_addresses(dns_result)
-            operation = lambda: check_tcp(self.target, addresses)
-
-        return self._run_check("tcp", operation)
+        if reason := _dns_skip_reason(dns_result):
+            return self._skip_check("tcp", "TCP", reason)
+        addresses = _connection_addresses(dns_result)
+        return self._run_check(
+            "tcp",
+            lambda: check_tcp(self.target, addresses),
+        )
 
     def inspect_tls(self):
         if self.target["scheme"] != "https":
-            return self._run_check(
-                "tls",
-                lambda: skipped_result(
-                    "tls",
-                    "TLS",
-                    "TLS does not apply to an HTTP target.",
-                ),
+            return self._skip_check(
+                "tls", "TLS", "TLS does not apply to an HTTP target."
             )
 
         dns_result = self.inspect_dns()
+        if reason := _dns_skip_reason(dns_result):
+            return self._skip_check("tls", "TLS", reason)
         tcp_result = self.inspect_tcp()
-
-        if dns_result["status"] == "error":
-            operation = lambda: skipped_result(
-                "tls",
-                "TLS",
-                "Skipped because DNS failed.",
-            )
-        elif dns_result.get("proxy_fake_ip"):
-            operation = lambda: skipped_result(
-                "tls",
-                "TLS",
-                "Skipped because proxy DNS returned a synthetic IP address.",
-            )
-        elif tcp_result["status"] == "error":
-            operation = lambda: skipped_result(
-                "tls",
-                "TLS",
-                "Skipped because TCP failed.",
-            )
-        else:
-            operation = lambda: check_tls(self.target, tcp_result)
-
-        return self._run_check("tls", operation)
+        if tcp_result["status"] == "error":
+            return self._skip_check("tls", "TLS", "Skipped because TCP failed.")
+        return self._run_check(
+            "tls",
+            lambda: check_tls(self.target, tcp_result),
+        )
 
     def inspect_http(self):
         network_result = self.inspect_client()
@@ -169,20 +152,13 @@ class DiagnosticContext:
 
     def inspect_traceroute(self):
         dns_result = self.inspect_dns()
-
-        if dns_result["status"] == "error":
-            operation = lambda: skipped_traceroute(
-                "Skipped because DNS failed.",
-            )
-        elif dns_result.get("proxy_fake_ip"):
-            operation = lambda: skipped_traceroute(
-                "Skipped because proxy DNS returned a synthetic IP address.",
-            )
-        else:
-            addresses = _connection_addresses(dns_result)
-            operation = lambda: check_traceroute(addresses)
-
-        return self._run_check("traceroute", operation)
+        if reason := _dns_skip_reason(dns_result):
+            return self._skip_check("traceroute", "Traceroute", reason)
+        addresses = _connection_addresses(dns_result)
+        return self._run_check(
+            "traceroute",
+            lambda: check_traceroute(addresses),
+        )
 
     def tool_payload(self, requested_tool, result):
         return {

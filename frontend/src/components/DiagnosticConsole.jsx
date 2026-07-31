@@ -9,7 +9,34 @@ import {
 import {CopyIcon, TerminalIcon} from "./Icons";
 import Panel from "./ui/Panel";
 
-function LiveToolEvent({callNumber, event, index, showRaw}) {
+function ToolResult({index, live = false, result}) {
+    const label = live ? "RESULT" : "CHECK";
+    const labelClass = live ? "term-return" : "term-check";
+    const className = live
+        ? `terminal-group terminal-live-result term-${result.status}`
+        : "terminal-group";
+
+    return (
+        <div className={className} style={{"--motion-index": index}}>
+            <p><span className={labelClass}>[{label}]</span> {result.name}</p>
+            <p className="terminal-indent">
+                <span className={`term-${result.status}`}>
+                    [{statusLabel(result.status)}]
+                </span> {result.summary}
+            </p>
+            <p className="terminal-indent">
+                <span className="term-info">[TIME]</span> {result.duration_ms} ms
+            </p>
+            {detailLines(result.details).map(({label: field, display}) => (
+                <p className="terminal-indent" key={field}>
+                    <span className="term-return">[RETURN]</span> {field}: {display}
+                </p>
+            ))}
+        </div>
+    );
+}
+
+function LiveToolEvent({callNumber, event, index}) {
     if (event.type === "tool_started") {
         return (
             <p className="terminal-indent" style={{"--motion-index": index}}>
@@ -26,38 +53,7 @@ function LiveToolEvent({callNumber, event, index, showRaw}) {
         );
     }
 
-    const result = event.result;
-    return (
-        <div
-            className={`terminal-group terminal-live-result term-${result.status}`}
-            style={{"--motion-index": index}}
-        >
-            <p>
-                <span className="term-return">[RESULT]</span> {result.name}
-            </p>
-            <p className="terminal-indent">
-                <span className={`term-${result.status}`}>
-                    [{statusLabel(result.status)}]
-                </span> {result.summary}
-            </p>
-            <p className="terminal-indent">
-                <span className="term-info">[TIME]</span> {result.duration_ms} ms
-            </p>
-            {detailLines(result.details).map((detail) => (
-                <p className="terminal-indent" key={detail.label}>
-                    <span className="term-return">[RETURN]</span> {detail.label}: {detail.display}
-                </p>
-            ))}
-            {showRaw && (
-                <div className="terminal-raw-block">
-                    <p className="terminal-indent raw-title">
-                        <span className="term-raw">[RAW RETURN]</span> Live tool result
-                    </p>
-                    <pre>{JSON.stringify(result, null, 2)}</pre>
-                </div>
-            )}
-        </div>
-    );
+    return <ToolResult index={index} live result={event.result} />;
 }
 
 export default function DiagnosticConsole({
@@ -66,7 +62,6 @@ export default function DiagnosticConsole({
     label = "Agent Tool Evidence",
     state = "idle",
 }) {
-    const [showRaw, setShowRaw] = useState(true);
     const [copyState, setCopyState] = useState("Copy JSON");
     const [copyAnnouncement, setCopyAnnouncement] = useState("");
     const copyOperationRef = useRef(0);
@@ -78,8 +73,6 @@ export default function DiagnosticConsole({
         ? "live-dot live-dot-loading"
         : (currentState === "error" ? "live-dot live-dot-error" : "live-dot");
     const checks = report ? reportLayers(report) : [];
-    const hasLiveResults = events.some((event) => event.type === "tool_completed");
-
     useEffect(() => {
         copyOperationRef.current += 1;
         if (copyResetTimerRef.current !== null) {
@@ -150,27 +143,15 @@ export default function DiagnosticConsole({
                     <Panel.Title className="panel-title"><TerminalIcon size={18} /> {label}</Panel.Title>
                 </div>
                 <div className="console-actions">
-                    {(report || hasLiveResults) && (
-                        <>
-                            <button
-                                aria-pressed={showRaw}
-                                className={showRaw ? "console-action console-action-active" : "console-action"}
-                                onClick={() => setShowRaw((visible) => !visible)}
-                                type="button"
-                            >
-                                Raw {showRaw ? "on" : "off"}
-                            </button>
-                            {report && (
-                                <button
-                                    aria-busy={copyState === "Copying"}
-                                    className="console-action"
-                                    onClick={copyReport}
-                                    type="button"
-                                >
-                                    <CopyIcon size={13} /> {copyState}
-                                </button>
-                            )}
-                        </>
+                    {report && (
+                        <button
+                            aria-busy={copyState === "Copying"}
+                            className="console-action"
+                            onClick={copyReport}
+                            type="button"
+                        >
+                            <CopyIcon size={13} /> {copyState}
+                        </button>
                     )}
                     <span
                         aria-hidden="true"
@@ -210,7 +191,6 @@ export default function DiagnosticConsole({
                         event={event}
                         index={index}
                         key={`${event.type}-${event.tool}-${index}`}
-                        showRaw={showRaw}
                     />
                 ))}
 
@@ -246,31 +226,12 @@ export default function DiagnosticConsole({
                                 ))}
                             </>
                         )}
-                        {checks.map((layer, index) => (
-                            <div
-                                className="terminal-group"
-                                key={`${layer.key}-${index}`}
-                                style={{"--motion-index": index}}
-                            >
-                                <p><span className="term-check">[CHECK]</span> {layer.name}</p>
-                                <p className="terminal-indent">
-                                    <span className={`term-${layer.status}`}>
-                                        [{statusLabel(layer.status)}]
-                                    </span> {layer.summary}
-                                </p>
-                                <p className="terminal-indent"><span className="term-info">[TIME]</span> {layer.duration_ms} ms</p>
-                                {detailLines(layer.details).map((detail) => (
-                                    <p className="terminal-indent" key={detail.label}>
-                                        <span className="term-return">[RETURN]</span> {detail.label}: {detail.display}
-                                    </p>
-                                ))}
-                                {showRaw && (
-                                    <div className="terminal-raw-block">
-                                        <p className="terminal-indent raw-title"><span className="term-raw">[RAW RETURN]</span> {layer.name} tool result</p>
-                                        <pre>{JSON.stringify(layer, null, 2)}</pre>
-                                    </div>
-                                )}
-                            </div>
+                        {checks.map((result, index) => (
+                            <ToolResult
+                                index={index}
+                                key={`${result.key}-${index}`}
+                                result={result}
+                            />
                         ))}
                         <p className="terminal-done"><span className="term-info">[DONE]</span> Finished in {report.duration_ms} ms · {report.status.toUpperCase()}</p>
                     </>

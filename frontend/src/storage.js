@@ -1,5 +1,7 @@
+import {openDB} from "idb";
+
+
 const DATABASE_NAME = "servicepath";
-const DATABASE_VERSION = 1;
 const SETTINGS_KEY = "current";
 
 export const defaultSettings = {
@@ -14,45 +16,15 @@ export const defaultSettings = {
     provider_type: "custom",
 };
 
-function requestResult(request) {
-    return new Promise((resolve, reject) => {
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-function openDatabase() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-        request.onupgradeneeded = () => {
-            const database = request.result;
-            database.createObjectStore("settings");
-            database.createObjectStore("reports", {
-                autoIncrement: true,
-                keyPath: "id",
-            });
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-async function store(name, mode, operation) {
-    const database = await openDatabase();
-    try {
-        const transaction = database.transaction(name, mode);
-        return await operation(transaction.objectStore(name));
-    } finally {
-        database.close();
-    }
-}
+const databasePromise = openDB(DATABASE_NAME, 1, {
+    upgrade(db) {
+        db.createObjectStore("settings");
+        db.createObjectStore("reports", {autoIncrement: true, keyPath: "id"});
+    },
+});
 
 export async function getBrowserSettings() {
-    const saved = await store(
-        "settings",
-        "readonly",
-        (settings) => requestResult(settings.get(SETTINGS_KEY)),
-    );
+    const saved = await (await databasePromise).get("settings", SETTINGS_KEY);
     return {...defaultSettings, ...(saved || {})};
 }
 
@@ -63,20 +35,12 @@ export async function saveBrowserSettings(settings) {
             settings[key] ?? defaultSettings[key],
         ]),
     );
-    await store(
-        "settings",
-        "readwrite",
-        (records) => requestResult(records.put(saved, SETTINGS_KEY)),
-    );
+    await (await databasePromise).put("settings", saved, SETTINGS_KEY);
     return saved;
 }
 
 export async function saveReport(report) {
-    const id = await store(
-        "reports",
-        "readwrite",
-        (reports) => requestResult(reports.add(report)),
-    );
+    const id = await (await databasePromise).add("reports", report);
     return {...report, id};
 }
 
@@ -85,11 +49,7 @@ export async function getReport(reportId) {
     if (!Number.isSafeInteger(id) || id < 1) {
         throw new Error("Report ID is invalid.");
     }
-    const report = await store(
-        "reports",
-        "readonly",
-        (reports) => requestResult(reports.get(id)),
-    );
+    const report = await (await databasePromise).get("reports", id);
     if (!report) {
         throw new Error("Report not found in this browser.");
     }
@@ -97,10 +57,6 @@ export async function getReport(reportId) {
 }
 
 export async function getHistory() {
-    const reports = await store(
-        "reports",
-        "readonly",
-        (records) => requestResult(records.getAll()),
-    );
+    const reports = await (await databasePromise).getAll("reports");
     return reports.sort((left, right) => right.id - left.id).slice(0, 50);
 }
