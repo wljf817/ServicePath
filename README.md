@@ -110,8 +110,15 @@ Copy the example configuration before adding secrets:
 
 ```bash
 cp servicepath.config.example.json servicepath.config.json
-chmod 600 servicepath.config.json
+sudo chown root:10001 servicepath.config.json
+sudo chmod 640 servicepath.config.json
+sudoedit servicepath.config.json
 ```
+
+The image runs as UID/GID `10001`. Keeping the file owned by `root`, readable
+by group `10001`, and inaccessible to everyone else lets the unprivileged
+container read it without exposing provider keys to other host users. Apply
+the same ownership and mode after replacing the file.
 
 Set its host path in `.env`:
 

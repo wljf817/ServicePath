@@ -11,7 +11,12 @@ services:
     ports:
       - "${SERVICEPATH_BIND_ADDRESS:-127.0.0.1}:${SERVICEPATH_PORT:-5050}:5050"
     volumes:
-      - "${SERVICEPATH_CONFIG_FILE:-./servicepath.config.example.json}:/config/servicepath.json:ro"
+      - type: bind
+        source: "${SERVICEPATH_CONFIG_FILE:-./servicepath.config.example.json}"
+        target: /config/servicepath.json
+        read_only: true
+        bind:
+          create_host_path: false
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m

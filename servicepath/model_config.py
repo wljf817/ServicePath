@@ -63,7 +63,11 @@ def load_server_config(path):
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as error:
+    except PermissionError as error:
+        raise SettingsError("Server configuration file is not readable.") from error
+    except OSError as error:
+        raise SettingsError("Server configuration file could not be read.") from error
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
         raise SettingsError("Server configuration file is invalid.") from error
     if (
         not isinstance(data, dict)
