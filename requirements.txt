@@ -1,5 +1,8 @@
-Flask>=3.0,<4.0
-openai>=1.0,<3.0
-openai-agents>=0.19,<1.0
-python-dotenv>=1.0,<2.0
+Flask>=3.1,<4.0
+# Production WSGI server for POSIX and container deployments.
+gunicorn>=26.0,<27.0; platform_system != "Windows"
+openai>=2.50,<3.0
+# Pin the pre-1.0 agent runtime to the tested release.
+openai-agents==0.19.1
+python-dotenv>=1.2,<2.0
 requests>=2.31,<3.0
