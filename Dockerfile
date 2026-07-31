@@ -58,7 +58,7 @@ USER servicepath:servicepath
 
 EXPOSE 5050
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=1 \
     CMD ["python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:5050/healthz', timeout=3).close()"]
 
 ENTRYPOINT ["python", "-m", "servicepath.container"]

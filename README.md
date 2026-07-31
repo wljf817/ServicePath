@@ -5,9 +5,13 @@ public HTTP(S) address and it collects bounded network evidence, identifies the
 earliest observed failure layer, and saves a report with practical next steps.
 Checks run on the ServicePath host, not in the browser.
 
-Results are classified as reachable, degraded, unreachable, or inconclusive.
-Each report includes evidence, failure stage, confidence, causes, and next
-steps. Unsupported conclusions become low-confidence inconclusive reports.
+Results are classified as reachable, degraded, or unreachable. Each report
+includes evidence, failure stage, confidence, causes, and next steps. Invalid
+configuration, tool failures, and unsupported conclusions stop the run with an
+error, and no report is saved.
+
+Tool calls and their returned evidence stream to the browser while the Agent
+is running; the completed report is saved only after final validation.
 
 ## Checks
 
@@ -30,7 +34,7 @@ report are generated from tool results rather than model-authored claims.
 Requirements:
 
 - Python 3.10 or newer
-- A model API that supports tool calls and structured output
+- An OpenAI-compatible model API with tool calling and JSON output
 - `traceroute` on macOS/Linux or `tracert` on Windows for route evidence
 - Node.js only when changing the frontend
 
@@ -49,6 +53,15 @@ Configure at least the model key and name in `.env`:
 ```dotenv
 OPENAI_API_KEY=your_key
 OPENAI_MODEL=gpt-5.6
+```
+
+For DeepSeek:
+
+```dotenv
+OPENAI_API_KEY=your_deepseek_key
+OPENAI_MODEL=deepseek-v4-flash
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_API_MODE=chat_completions
 ```
 
 Start the local server:
@@ -78,7 +91,7 @@ SETTINGS_PASSWORD=first_random_value
 SERVICEPATH_API_TOKEN=second_random_value
 ```
 
-Set the model variables there as well, or configure the provider from Settings
+Set the model variables there as well, or configure OpenAI from Settings
 after startup. Build and start the service:
 
 ```bash
@@ -112,40 +125,37 @@ docker compose up -d
 `docker compose down -v` permanently deletes saved settings and reports. The
 current SQLite and runtime-settings design supports one container only; do not
 scale it horizontally. A public reverse proxy should allow at least five
-minutes for a diagnosis request. A Local Test inside Docker observes the
+minutes for a diagnosis request. A Client Test inside Docker observes the
 container's network namespace, not the host's exact network path.
 
 ## Execution modes
 
-- **Remote Test** runs on the current process when its role is `remote_server`;
-  a `local_device` sends it to the configured remote ServicePath instance.
-- **Local Test** runs on the current `local_device`.
-- **Compare Both** runs the remote test first, then the local test, and compares
-  the two reports deterministically.
+- **Server Test** runs on the current process when its role is `server`; a
+  `client` sends it to the endpoint fixed by `REMOTE_SERVICE_URL` at deployment.
+- **Client Test** runs directly on the current `client` device.
 
-The default role is `remote_server`, which permits only Remote Test because a
-hosted page cannot inspect a visitor's raw network path. Install ServicePath on
-the device being investigated and select `local_device` when local evidence is
-required. Connected local and remote instances must use the same
-`SERVICEPATH_API_TOKEN`.
+The default role is `server`, which permits only Server Test because a hosted
+page cannot inspect a visitor's raw network path. Install ServicePath on the
+device being investigated and select `client` when client evidence is required.
+The client and server must use the same `SERVICEPATH_API_TOKEN`. The server URL
+is deployment configuration and is not editable in the Settings page.
 
 ## Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | Empty | Model provider credential |
+| `OPENAI_API_KEY` | Empty | Model provider API credential |
 | `OPENAI_MODEL` | `gpt-5.6` | Provider model identifier |
-| `OPENAI_BASE_URL` | Provider default | Optional compatible API URL |
-| `OPENAI_API_MODE` | `auto` | `auto`, `responses`, or `chat_completions` |
-| `REMOTE_SERVICE_URL` | Empty | Fallback remote ServicePath URL |
-| `SERVICEPATH_API_TOKEN` | Empty | Shared remote diagnostic bearer token |
+| `OPENAI_BASE_URL` | Empty | Optional OpenAI-compatible endpoint |
+| `OPENAI_API_MODE` | `responses` | `responses` or `chat_completions` |
+| `REMOTE_SERVICE_URL` | Empty | Fixed server endpoint used by a client instance |
+| `SERVICEPATH_API_TOKEN` | Empty | Shared client-server bearer token |
 | `SETTINGS_PASSWORD` | Empty | Protects settings writes |
 | `SERVICEPATH_DATA_DIR` | Project paths | Shared settings and database directory |
 
 Secrets written through Settings use an owner-only `.env` file and are never
 returned to the browser. Leaving an existing secret field empty keeps its
-current value. The API base URL is not treated as a secret and can be viewed,
-changed, or cleared.
+current value.
 
 ## Development
 
