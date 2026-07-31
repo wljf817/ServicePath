@@ -242,9 +242,9 @@ def _observed_problem(context):
         elif status == "error":
             return "error", key
 
-    tls_result = context.results.get("tls", {})
-    if tls_result.get("status") == "warning":
-        return "warning", "tls"
+    for key in ("tcp", "tls"):
+        if context.results.get(key, {}).get("status") == "warning":
+            return "warning", key
 
     status_code = _http_status_code(context)
     if status_code is not None and 400 <= status_code <= 499:

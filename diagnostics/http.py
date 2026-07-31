@@ -3,6 +3,7 @@ import socket
 from time import perf_counter
 from urllib.parse import urljoin
 
+import dns.exception
 import requests
 
 from diagnostics.dns import resolve_addresses
@@ -13,6 +14,23 @@ from diagnostics.target import TargetError, normalize_target, validate_public_ad
 TITLE_PATTERN = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 MAX_REDIRECTS = 5
 MAX_BODY_BYTES = 128 * 1024
+
+
+def _http_version(response):
+    return {
+        10: "HTTP/1.0",
+        11: "HTTP/1.1",
+        20: "HTTP/2",
+        30: "HTTP/3",
+    }.get(response.raw.version, f"Unknown ({response.raw.version})")
+
+
+def _negotiated_protocol(response):
+    connection = getattr(response.raw, "_connection", None)
+    connection_socket = getattr(connection, "sock", None)
+    if connection_socket and hasattr(connection_socket, "selected_alpn_protocol"):
+        return connection_socket.selected_alpn_protocol() or "Not negotiated"
+    return "Not available"
 
 
 def _page_title(response):
@@ -86,10 +104,13 @@ def check_http(
                 redirects.append(current_url)
                 continue
 
-            title = _page_title(response)
             status_code = response.status_code
             final_url = current_target["url"]
             headers = response.headers
+            http_version = _http_version(response)
+            negotiated_protocol = _negotiated_protocol(response)
+            response_headers_ms = round(response.elapsed.total_seconds() * 1000)
+            title = _page_title(response)
             response.close()
 
             details = {
@@ -99,6 +120,12 @@ def check_http(
                 "Final URL": final_url,
                 "Redirects": redirects,
                 "Page title": title,
+                "HTTP version": http_version,
+                "Negotiated ALPN": negotiated_protocol,
+                "Response headers time": f"{response_headers_ms} ms",
+                "Content type": headers.get("Content-Type", "Not reported"),
+                "Content length": headers.get("Content-Length", "Not reported"),
+                "Alt-Svc": headers.get("Alt-Svc", "Not advertised"),
                 "Server": headers.get("Server", "Not reported"),
                 "CDN/WAF": _server_features(headers),
             }
@@ -117,7 +144,12 @@ def check_http(
             return make_result("http", "HTTP", status, summary, duration, details)
 
         raise requests.TooManyRedirects(f"More than {MAX_REDIRECTS} redirects")
-    except (requests.RequestException, socket.gaierror, TargetError) as error:
+    except (
+        dns.exception.DNSException,
+        requests.RequestException,
+        socket.gaierror,
+        TargetError,
+    ) as error:
         duration = round((perf_counter() - started) * 1000)
         return make_result(
             "http",

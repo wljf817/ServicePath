@@ -9,7 +9,50 @@ from diagnostics.result import make_result
 from diagnostics.target import effective_port
 
 
-def check_tls(target, addresses, tcp_result, timeout=4):
+def _handshake(target, address, port, timeout):
+    context = ssl.create_default_context(cafile=certifi.where())
+    raw_socket = None
+    secure_socket = None
+    started = perf_counter()
+
+    try:
+        raw_socket = socket.create_connection((address, port), timeout=timeout)
+        secure_socket = context.wrap_socket(
+            raw_socket,
+            server_hostname=target["hostname"],
+        )
+        certificate = secure_socket.getpeercert()
+        expires_at = datetime.fromtimestamp(
+            ssl.cert_time_to_seconds(certificate.get("notAfter")),
+            timezone.utc,
+        )
+        days_left = (expires_at - datetime.now(timezone.utc)).days
+        cipher = secure_socket.cipher()
+        return {
+            "status": "warning" if days_left < 14 else "passed",
+            "address": address,
+            "time_ms": round((perf_counter() - started) * 1000),
+            "error": None,
+            "TLS version": secure_socket.version(),
+            "Cipher": cipher[0] if cipher else "Unknown",
+            "Certificate expires": expires_at.isoformat(),
+            "Days remaining": days_left,
+        }
+    except (OSError, ssl.SSLError, ValueError) as error:
+        return {
+            "status": "error",
+            "address": address,
+            "time_ms": round((perf_counter() - started) * 1000),
+            "error": str(error),
+        }
+    finally:
+        if secure_socket:
+            secure_socket.close()
+        elif raw_socket:
+            raw_socket.close()
+
+
+def check_tls(target, tcp_result, timeout=4):
     if target["scheme"] != "https":
         return make_result(
             "tls",
@@ -20,94 +63,51 @@ def check_tls(target, addresses, tcp_result, timeout=4):
 
     started = perf_counter()
     port = effective_port(target)
-    tcp_port = tcp_result["details"]["ports"].get(str(port), {})
+    families = {}
 
-    if tcp_port.get("status") != "passed":
-        return make_result(
-            "tls",
-            "TLS",
-            "skipped",
-            f"TLS check skipped because TCP port {port} is unavailable.",
-            details={
-                "Port": port,
-                "SNI hostname": target["hostname"],
-                "TCP status": "Unavailable",
-            },
-        )
-
-    context = ssl.create_default_context(cafile=certifi.where())
-    last_error = "TLS handshake failed"
-
-    for address in addresses:
-        raw_socket = None
-        secure_socket = None
-
-        try:
-            raw_socket = socket.create_connection((address, port), timeout=timeout)
-            secure_socket = context.wrap_socket(
-                raw_socket,
-                server_hostname=target["hostname"],
+    for family, tcp_family in tcp_result["details"]["Address families"].items():
+        if tcp_family["status"] == "passed":
+            families[family] = _handshake(
+                target,
+                tcp_family["address"],
+                port,
+                timeout,
             )
-            certificate = secure_socket.getpeercert()
-            expires_text = certificate.get("notAfter")
-            expires_at = datetime.fromtimestamp(
-                ssl.cert_time_to_seconds(expires_text),
-                timezone.utc,
-            )
-            days_left = (expires_at - datetime.now(timezone.utc)).days
-            cipher = secure_socket.cipher()
-            duration = round((perf_counter() - started) * 1000)
-            details = {
-                "Port": port,
-                "Connected address": address,
-                "SNI hostname": target["hostname"],
-                "Certificate trusted": "Yes",
-                "Hostname matches": "Yes",
-                "TLS version": secure_socket.version(),
-                "Cipher": cipher[0] if cipher else "Unknown",
-                "Certificate expires": expires_at.isoformat(),
-                "Days remaining": days_left,
+        else:
+            families[family] = {
+                "status": "skipped",
+                "address": tcp_family["address"],
+                "time_ms": 0,
+                "error": "TCP unavailable for this address family",
             }
 
-            if days_left < 14:
-                return make_result(
-                    "tls",
-                    "TLS",
-                    "warning",
-                    f"The certificate is valid but expires in {days_left} day(s).",
-                    duration,
-                    details,
-                )
+    attempted = [
+        result for result in families.values()
+        if result["status"] != "skipped"
+    ]
+    passed = sum(result["status"] == "passed" for result in attempted)
+    warned = sum(result["status"] == "warning" for result in attempted)
 
-            return make_result(
-                "tls",
-                "TLS",
-                "passed",
-                "TLS handshake and certificate validation succeeded.",
-                duration,
-                details,
-            )
-        except (OSError, ssl.SSLError, ValueError) as error:
-            last_error = str(error)
-        finally:
-            if secure_socket:
-                secure_socket.close()
-            elif raw_socket:
-                raw_socket.close()
+    if attempted and passed == len(attempted):
+        status = "passed"
+        summary = "TLS validation succeeded on every connected address family."
+    elif passed or warned:
+        status = "warning"
+        summary = "TLS validation was incomplete on the available address families."
+    else:
+        status = "error"
+        summary = "TLS validation failed on every connected address family."
 
     duration = round((perf_counter() - started) * 1000)
     return make_result(
         "tls",
         "TLS",
-        "error",
-        f"TLS handshake failed: {last_error}",
+        status,
+        summary,
         duration,
         {
             "Port": port,
             "SNI hostname": target["hostname"],
-            "TLS handshake": "Failed",
-            "Certificate trusted": "Not confirmed",
-            "Hostname matches": "Not confirmed",
-            "Error": last_error,
+            "Address families": families,
         },
     )

@@ -24,36 +24,56 @@ def _connect(address, port, timeout):
         connection.close()
 
 
+def _family_result(addresses, port, timeout):
+    if not addresses:
+        return {
+            "status": "skipped",
+            "address": None,
+            "time_ms": 0,
+            "error": "No DNS address for this family",
+        }
+
+    address = addresses[0]
+    started = perf_counter()
+    connected, error = _connect(address, port, timeout)
+    return {
+        "status": "passed" if connected else "error",
+        "address": address,
+        "time_ms": round((perf_counter() - started) * 1000),
+        "error": error,
+    }
+
+
 def check_tcp(target, addresses, timeout=3):
     started = perf_counter()
     port = effective_port(target)
-    port_results = {}
-
-    port_started = perf_counter()
-    connected_address = None
-    last_error = "Connection failed"
-
-    for address in addresses:
-        connected, error = _connect(address, port, timeout)
-        if connected:
-            connected_address = address
-            break
-        if error:
-            last_error = error
-
-    port_results[str(port)] = {
-        "status": "passed" if connected_address else "error",
-        "address": connected_address,
-        "time_ms": round((perf_counter() - port_started) * 1000),
-        "error": None if connected_address else last_error,
+    families = {
+        "IPv4": _family_result(
+            [address for address in addresses if ":" not in address],
+            port,
+            timeout,
+        ),
+        "IPv6": _family_result(
+            [address for address in addresses if ":" in address],
+            port,
+            timeout,
+        ),
     }
+    attempted = [
+        result for result in families.values()
+        if result["status"] != "skipped"
+    ]
+    passed = sum(result["status"] == "passed" for result in attempted)
 
-    if connected_address:
+    if attempted and passed == len(attempted):
         status = "passed"
-        summary = f"TCP connection succeeded on port {port}."
+        summary = f"TCP port {port} accepted every available address family."
+    elif passed:
+        status = "warning"
+        summary = f"TCP port {port} worked on only one address family."
     else:
         status = "error"
-        summary = f"TCP port {port} did not accept a connection."
+        summary = f"TCP port {port} did not accept any connection."
 
     duration = round((perf_counter() - started) * 1000)
     return make_result(
@@ -62,5 +82,5 @@ def check_tcp(target, addresses, timeout=3):
         status,
         summary,
         duration,
-        {"ports": port_results},
+        {"Port": port, "Address families": families},
     )

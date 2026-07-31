@@ -138,8 +138,7 @@ class DiagnosticContext:
                 "Skipped because TCP failed.",
             )
         else:
-            addresses = _connection_addresses(dns_result)
-            operation = lambda: check_tls(self.target, addresses, tcp_result)
+            operation = lambda: check_tls(self.target, tcp_result)
 
         return self._run_check("tls", operation)
 

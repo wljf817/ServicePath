@@ -14,11 +14,11 @@ tokens, or browser settings.
 | Stage | Evidence |
 | --- | --- |
 | Client | IPv4/IPv6 route availability and proxy detection |
-| DNS | A/AAAA records and public-address validation |
+| DNS | A/AAAA, CNAME, NS, SOA, TTL, DNSSEC, and public-address validation |
 | Route | Optional `traceroute` or `tracert` |
-| TCP | Connections to the target port |
-| TLS | Trust, hostname, protocol, cipher, and expiry |
-| HTTP | Redirects, status, title, headers, and CDN/WAF signals |
+| TCP | Independent IPv4 and IPv6 connections to the target port |
+| TLS | Per-family trust, hostname, protocol, cipher, and expiry |
+| HTTP | Redirects, protocol, ALPN, timing, content, and CDN/WAF signals |
 
 Targets are normalized and locked before execution. Agent tools cannot change
 the target, and invalid configuration or unsupported conclusions stop the run
