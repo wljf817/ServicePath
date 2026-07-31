@@ -1,98 +1,127 @@
 # ServicePath
 
-ServicePath is an AI-assisted website connectivity diagnostic tool. Give it a
-public HTTP(S) address and it collects bounded network evidence, identifies the
-earliest observed failure layer, and saves a report with practical next steps.
-Checks run on the ServicePath host, not in the browser.
+ServicePath is an AI-assisted website connectivity diagnostic tool. It gives a
+bounded Agent read-only network tools, streams tool calls and evidence to the
+browser, and produces a validated report covering the observed failure layer,
+confidence, causes, and next actions.
 
-Results are classified as reachable, degraded, or unreachable. Each report
-includes evidence, failure stage, confidence, causes, and next steps. Invalid
-configuration, tool failures, and unsupported conclusions stop the run with an
-error, and no report is saved.
-
-Tool calls and their returned evidence stream to the browser while the Agent
-is running; the completed report is saved only after final validation.
+Reports and user settings are stored only in the current browser with
+IndexedDB. The server does not store history, user API keys, custom-server
+tokens, or browser settings.
 
 ## Checks
 
 | Stage | Evidence |
 | --- | --- |
-| Client | IPv4/IPv6 route availability and system proxy detection |
-| DNS | A/AAAA records, resolution failures, and public-address validation |
-| Route | A short, optional `traceroute` or `tracert` |
-| TCP | Connection results for the target's effective port |
-| TLS | Trust, hostname, protocol, cipher, and certificate expiry |
-| HTTP | Redirects, status, title, server header, and basic CDN/WAF signals |
+| Client | IPv4/IPv6 route availability and proxy detection |
+| DNS | A/AAAA records and public-address validation |
+| Route | Optional `traceroute` or `tracert` |
+| TCP | Connections to the target port |
+| TLS | Trust, hostname, protocol, cipher, and expiry |
+| HTTP | Redirects, status, title, headers, and CDN/WAF signals |
 
-The Agent can only use server-owned, read-only tools. The target is normalized
-and locked before execution, while tool calls, Agent turns, response samples,
-redirects, and execution times are bounded. Evidence summaries displayed in a
-report are generated from tool results rather than model-authored claims.
+Targets are normalized and locked before execution. Agent tools cannot change
+the target, and invalid configuration or unsupported conclusions stop the run
+without saving a report. There are no retries, fallbacks, or automatic server
+switches.
 
 ## Local setup
 
-Requirements:
-
-- Python 3.10 or newer
-- An OpenAI-compatible model API with tool calling and JSON output
-- `traceroute` on macOS/Linux or `tracert` on Windows for route evidence
-- Node.js only when changing the frontend
-
-Create an environment and install the application:
+Requirements: Python 3.10+, an OpenAI-compatible model with tool calling and
+JSON output, and `traceroute` on macOS/Linux or `tracert` on Windows.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-cp .env.example .env
-chmod 600 .env
-```
-
-Configure at least the model key and name in `.env`:
-
-```dotenv
-OPENAI_API_KEY=your_key
-OPENAI_MODEL=gpt-5.6
-```
-
-For DeepSeek:
-
-```dotenv
-OPENAI_API_KEY=your_deepseek_key
-OPENAI_MODEL=deepseek-v4-flash
-OPENAI_BASE_URL=https://api.deepseek.com
-OPENAI_API_MODE=chat_completions
-```
-
-Start the local server:
-
-```bash
 python app.py
 ```
 
-Open `http://127.0.0.1:5050`. Reports are stored in
-`instance/servicepath.db`. Set `SERVICEPATH_DEBUG=1` only when Flask debug mode
-is intentionally needed.
-
-## Docker deployment
-
-Docker Engine or Docker Desktop with the Compose plugin is required. Create
-`.env` from `.env.example`, then generate two different secrets by running this
-command twice:
+Open `http://127.0.0.1:5050`. Settings separates model providers from remote
+ServicePath servers; custom values are private to the current browser.
+Node.js is required only when changing the React frontend:
 
 ```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+npm ci
+npm run build
 ```
 
-Store the results in `.env`:
+## Server presets
+
+The server can provide private model and remote-server presets from
+`servicepath.config.json`.
+Copy `servicepath.config.example.json`, keep the resulting file out of Git, and
+set restrictive file permissions.
+
+```json
+{
+  "server_token": "shared_custom_server_token",
+  "models": [
+    {
+      "id": "deepseek-v4-pro",
+      "name": "DeepSeek V4 Pro",
+      "api_key": "private_provider_key",
+      "model": "deepseek-v4-pro",
+      "base_url": "https://api.deepseek.com",
+      "api_mode": "chat_completions"
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "name": "DeepSeek V4 Flash",
+      "api_key": "private_provider_key",
+      "model": "deepseek-v4-flash",
+      "base_url": "https://api.deepseek.com",
+      "api_mode": "chat_completions"
+    }
+  ],
+  "servers": [
+    {
+      "id": "new-york",
+      "name": "New York",
+      "url": "https://nyc.servicepath.example",
+      "token": "private_remote_server_token"
+    }
+  ]
+}
+```
+
+Start with a custom path when needed:
+
+```bash
+SERVICEPATH_CONFIG=/secure/servicepath.config.json python app.py
+```
+
+The browser receives only public preset metadata. Model API keys, remote-server
+tokens, and the inbound server token are never returned. A server preset appears
+directly in the **Run from** list.
+
+## Custom ServicePath server
+
+Set `server_token` in the remote instance's private configuration. In the
+calling instance, add its URL and token to the `servers` list, or save them in
+the browser under Settings for a one-browser custom server. Remote Agent tool
+events are streamed live. The remote instance resolves its own model preset
+IDs; matching IDs must therefore exist there, or the user can select a custom
+provider.
+
+## Docker
+
+Copy the example configuration before adding secrets:
+
+```bash
+cp servicepath.config.example.json servicepath.config.json
+chmod 600 servicepath.config.json
+```
+
+Set its host path in `.env`:
 
 ```dotenv
-SETTINGS_PASSWORD=first_random_value
-SERVICEPATH_API_TOKEN=second_random_value
+SERVICEPATH_CONFIG_FILE=./servicepath.config.json
+SERVICEPATH_BIND_ADDRESS=127.0.0.1
+SERVICEPATH_PORT=5050
 ```
 
-Set the model variables there as well, or configure OpenAI from Settings
-after startup. Build and start the service:
+Then deploy:
 
 ```bash
 docker compose up -d --build
@@ -100,93 +129,19 @@ docker compose ps
 docker compose logs -f servicepath
 ```
 
-The container runs Gunicorn as an unprivileged user with a read-only root
-filesystem, dropped Linux capabilities, and a `/healthz` readiness check. The
-safe default publishes port 5050 only on `127.0.0.1`.
+The container runs as an unprivileged user with a read-only root filesystem,
+dropped capabilities, and a `/healthz` check. There is no application data
+volume because history and user settings remain in each browser.
 
-Change the host interface with `SERVICEPATH_BIND_ADDRESS` and the published port
-with `SERVICEPATH_PORT`. Keep the loopback default unless a trusted reverse
-proxy or another deliberate network boundary handles controlled external access.
+## Public deployment
 
-On the first start of a new volume, selected container variables are written to
-the private `/data/.env`. That persistent copy becomes authoritative, so
-changes made in Settings survive container replacement and are not overwritten
-by an older host `.env`. Reports are stored in `/data/servicepath.db` in the
-same `servicepath-data` volume.
+Use HTTPS. Browser-stored API keys are transmitted to the selected ServicePath
+server only for the active diagnosis and are never written to disk by the
+application. They are still accessible to JavaScript on the same origin, so a
+strong Content Security Policy and XSS prevention remain essential.
 
-Upgrade without deleting data:
-
-```bash
-docker compose down
-docker compose build --pull
-docker compose up -d
-```
-
-`docker compose down -v` permanently deletes saved settings and reports. The
-current SQLite and runtime-settings design supports one container only; do not
-scale it horizontally. A public reverse proxy should allow at least five
-minutes for a diagnosis request. A Client Test inside Docker observes the
-container's network namespace, not the host's exact network path.
-
-## Execution modes
-
-- **Server Test** runs on the current process when its role is `server`; a
-  `client` sends it to the endpoint fixed by `REMOTE_SERVICE_URL` at deployment.
-- **Client Test** runs directly on the current `client` device.
-
-The default role is `server`, which permits only Server Test because a hosted
-page cannot inspect a visitor's raw network path. Install ServicePath on the
-device being investigated and select `client` when client evidence is required.
-The client and server must use the same `SERVICEPATH_API_TOKEN`. The server URL
-is deployment configuration and is not editable in the Settings page.
-
-## Configuration
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `OPENAI_API_KEY` | Empty | Model provider API credential |
-| `OPENAI_MODEL` | `gpt-5.6` | Provider model identifier |
-| `OPENAI_BASE_URL` | Empty | Optional OpenAI-compatible endpoint |
-| `OPENAI_API_MODE` | `responses` | `responses` or `chat_completions` |
-| `REMOTE_SERVICE_URL` | Empty | Fixed server endpoint used by a client instance |
-| `SERVICEPATH_API_TOKEN` | Empty | Shared client-server bearer token |
-| `SETTINGS_PASSWORD` | Empty | Protects settings writes |
-| `SERVICEPATH_DATA_DIR` | Project paths | Shared settings and database directory |
-
-Secrets written through Settings use an owner-only `.env` file and are never
-returned to the browser. Leaving an existing secret field empty keeps its
-current value.
-
-## Development
-
-For frontend work:
-
-```bash
-npm ci
-npm run dev
-npm run build
-```
-
-Vite serves `http://127.0.0.1:5173` and proxies API calls to Flask on port 5050.
-Production assets are generated in `static/frontend/`; rebuild them after each
-frontend change and do not edit them by hand.
-
-## Security and limitations
-
-ServicePath rejects literal private, loopback, link-local, and reserved targets.
-It validates DNS results before checks and validates each HTTP redirect before
-following it. Agent tools cannot change the locked host, URL, port, or command,
-and traceroute never invokes a command shell.
-
-These controls are not an operating-system sandbox or a complete SSRF defense.
-The HTTP client can resolve an already checked hostname again while connecting,
-which leaves a DNS-rebinding race. Production deployments should also enforce
-outbound network policy.
-
-ServicePath has no general user authentication or built-in rate limiting.
-Diagnosis routes can consume model quota, while reports may expose stored
-network evidence. The target and selected evidence are sent to the configured
-model provider. Any public deployment must add TLS, authentication,
-authorization, request limits, and rate limiting at a reverse proxy. The HTTP
-check does not execute page JavaScript, and missing traceroute hops are only
-supporting evidence, not proof that normal traffic is blocked.
+ServicePath has no built-in user authentication or rate limiting. A public
+reverse proxy must provide TLS, authentication where required, rate limiting,
+request limits, and a timeout of at least five minutes. Apply outbound network
+policy as an additional SSRF boundary. Reports disappear when users clear site
+data and do not sync between browsers or devices.
