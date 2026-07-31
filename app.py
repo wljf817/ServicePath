@@ -13,4 +13,9 @@ if __name__ == "__main__":
         "yes",
     }
     # The app factory already loads the configured environment file.
-    app.run(debug=debug, port=5050, load_dotenv=False)
+    app.run(
+        debug=debug,
+        host=os.getenv("SERVICEPATH_HOST", "127.0.0.1"),
+        port=5050,
+        load_dotenv=False,
+    )

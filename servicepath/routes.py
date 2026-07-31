@@ -63,11 +63,6 @@ def frontend_app(report_id=None):
     return current_app.send_static_file("frontend/index.html")
 
 
-@bp.get("/healthz")
-def health():
-    return jsonify({"status": "ok"})
-
-
 @bp.get("/api/app-settings")
 def api_app_settings():
     config = _server_config()

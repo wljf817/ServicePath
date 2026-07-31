@@ -1,6 +1,4 @@
 Flask>=3.1,<4.0
-# Production WSGI server for POSIX and container deployments.
-gunicorn>=26.0,<27.0; platform_system != "Windows"
 openai>=2.50,<3.0
 # Pin the pre-1.0 agent runtime to the tested release.
 openai-agents==0.19.1

@@ -136,9 +136,9 @@ docker compose ps
 docker compose logs -f servicepath
 ```
 
-The container runs as an unprivileged user with a read-only root filesystem,
-dropped capabilities, and a `/healthz` check. There is no application data
-volume because history and user settings remain in each browser.
+The container runs as an unprivileged user with a read-only root filesystem and
+dropped capabilities. There is no application data volume because history and
+user settings remain in each browser.
 
 ## Public deployment
 
