@@ -77,14 +77,16 @@ def compare_reports(local_report, remote_report):
         status = "warning"
         title = "The problem is likely local to this device or network"
         summary = (
-            f"Local Test first reported {local_problem.upper()}, while Remote Test passed."
+            f"Local Test first reported {local_problem.upper()}, while Remote "
+            "Test passed."
         )
     elif not local_problem and remote_problem:
         classification = "remote_only"
         status = "warning"
         title = "The problem appears specific to the remote server path"
         summary = (
-            f"Remote Test first reported {remote_problem.upper()}, while Local Test passed."
+            f"Remote Test first reported {remote_problem.upper()}, while Local "
+            "Test passed."
         )
     elif local_problem == remote_problem:
         classification = "shared_problem"
@@ -93,7 +95,10 @@ def compare_reports(local_report, remote_report):
             remote_report["status"],
         } else "warning"
         title = "The problem affects both test locations"
-        summary = f"Both tests first reported a problem in the {local_problem.upper()} layer."
+        summary = (
+            "Both tests first reported a problem in the "
+            f"{local_problem.upper()} layer."
+        )
     else:
         classification = "different_results"
         status = "warning"

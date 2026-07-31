@@ -23,7 +23,10 @@ def _page_title(response):
         if len(body) >= MAX_BODY_BYTES:
             break
 
-    text = bytes(body[:MAX_BODY_BYTES]).decode(response.encoding or "utf-8", errors="replace")
+    text = bytes(body[:MAX_BODY_BYTES]).decode(
+        response.encoding or "utf-8",
+        errors="replace",
+    )
     match = TITLE_PATTERN.search(text)
 
     if not match:
