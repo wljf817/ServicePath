@@ -41,8 +41,8 @@ Rules:
 - A "reachable" verdict requires an HTTP response from the HTTP tool. If HTTP
   fails or times out, inspect the relevant lower layers before concluding so
   the report identifies the observed failure boundary when possible.
-- Never describe an unselected check as passed. Collect enough evidence for a
-  supported verdict or the run will fail.
+- Never describe an unselected check as passed. Collect enough evidence for
+  your conclusion.
 - A missing IPv6 route or the presence of a proxy is environment context, not
   by itself proof that the website is broken.
 - An unanswered traceroute hop is supporting evidence only; many networks
@@ -79,16 +79,7 @@ def _report_status(verdict):
     }[verdict]
 
 
-def _tool_evidence(context):
-    """Build display evidence only from trusted tool results."""
-    return [
-        f"{context.results[key]['name']}: {context.results[key]['summary']}"[:500]
-        for key in CHECK_ORDER
-        if key in context.results
-    ][:8]
-
-
-def _analysis_payload(diagnosis, model, context):
+def _analysis_payload(diagnosis, model):
     return {
         "source": "agent",
         "model": model,
@@ -97,7 +88,7 @@ def _analysis_payload(diagnosis, model, context):
         "text": diagnosis.summary,
         "failure_stage": diagnosis.failure_stage,
         "confidence": diagnosis.confidence,
-        "evidence": _tool_evidence(context),
+        "evidence": diagnosis.evidence,
         "causes": diagnosis.likely_causes,
         "actions": diagnosis.actions,
     }
@@ -129,7 +120,7 @@ def _build_report(
         "first_problem": first_problem,
         "layers": layers,
         "traceroute": traceroute,
-        "analysis": _analysis_payload(diagnosis, model, context),
+        "analysis": _analysis_payload(diagnosis, model),
         "agent": {
             "model": model,
             "api_mode": api_mode,
@@ -214,75 +205,6 @@ def _parse_diagnosis(value):
     return AgentDiagnosis.model_validate(value)
 
 
-def _http_status_code(context):
-    details = context.results.get("http", {}).get("details", {})
-    status_code = details.get("Status code")
-    if isinstance(status_code, int) and not isinstance(status_code, bool):
-        if 100 <= status_code <= 599:
-            return status_code
-    return None
-
-
-def _observed_problem(context):
-    """Return the severity and stage supported by tool evidence."""
-    for key in ("client", "dns", "tcp", "tls", "http"):
-        result = context.results.get(key)
-        if not result:
-            continue
-
-        status = result.get("status")
-        if key == "http":
-            status_code = _http_status_code(context)
-            if status_code is not None and status_code >= 500:
-                return "error", "application"
-            if status_code is not None and status_code >= 400:
-                continue
-            if status == "error":
-                return "error", "http"
-        elif status == "error":
-            return "error", key
-
-    for key in ("tcp", "tls"):
-        if context.results.get(key, {}).get("status") == "warning":
-            return "warning", key
-
-    status_code = _http_status_code(context)
-    if status_code is not None and 400 <= status_code <= 499:
-        return "warning", "application"
-
-    return None, None
-
-
-def _diagnosis_is_supported(diagnosis, context):
-    """Match the model verdict to a conservative evidence matrix."""
-    severity, stage = _observed_problem(context)
-
-    if severity == "error":
-        return (
-            diagnosis.failure_stage == stage
-            and diagnosis.verdict == "unreachable"
-        )
-
-    if severity == "warning":
-        return (
-            diagnosis.failure_stage == stage
-            and diagnosis.verdict == "degraded"
-        )
-
-    http_result = context.results.get("http", {})
-    has_success_response = (
-        http_result.get("status") == "passed"
-        and _http_status_code(context) is not None
-    )
-    if has_success_response:
-        return (
-            diagnosis.failure_stage is None
-            and diagnosis.verdict == "reachable"
-        )
-
-    return False
-
-
 def run_agent_diagnostics(
     value,
     provider,
@@ -313,7 +235,6 @@ def run_agent_diagnostics(
         instructions=AGENT_INSTRUCTIONS,
         model=model,
         model_settings=ModelSettings(
-            tool_choice="required",
             parallel_tool_calls=False,
             extra_body=_provider_extra_body(base_url, api_mode),
             extra_args=(
@@ -324,7 +245,6 @@ def run_agent_diagnostics(
         ),
         tools=AGENT_TOOLS,
         output_type=AgentDiagnosis if use_responses else None,
-        reset_tool_choice=True,
     )
     prompt = (
         "Investigate the server-locked target from this ServicePath runtime. "
@@ -362,11 +282,6 @@ def run_agent_diagnostics(
     if not context.results:
         raise AgentRunError(
             "The diagnostic agent finished without collecting network evidence."
-        )
-
-    if not _diagnosis_is_supported(diagnosis, context):
-        raise AgentRunError(
-            "The diagnostic agent conclusion is not supported by the evidence."
         )
 
     duration_ms = round((perf_counter() - started) * 1000)

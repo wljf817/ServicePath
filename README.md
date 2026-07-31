@@ -2,7 +2,7 @@
 
 ServicePath is an AI-assisted website connectivity diagnostic tool. It gives a
 bounded Agent read-only network tools, streams tool calls and evidence to the
-browser, and produces a validated report covering the observed failure layer,
+browser, and produces a structured report covering the observed failure layer,
 confidence, causes, and next actions.
 
 Reports and user settings are stored only in the current browser with
@@ -21,9 +21,9 @@ tokens, or browser settings.
 | HTTP | Redirects, protocol, ALPN, timing, content, and CDN/WAF signals |
 
 Targets are normalized and locked before execution. Agent tools cannot change
-the target, and invalid configuration or unsupported conclusions stop the run
-without saving a report. There are no retries, fallbacks, or automatic server
-switches.
+the target, and invalid configuration, malformed output, or a run without tool
+evidence stops without saving a report. There are no retries, fallbacks, or
+automatic server switches.
 
 ## Local setup
 
