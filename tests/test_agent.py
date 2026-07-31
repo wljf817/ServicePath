@@ -74,6 +74,16 @@ def diagnosis(verdict="reachable", failure_stage=None):
     )
 
 
+def http_result(status="passed", status_code=200):
+    return make_result(
+        "http",
+        "HTTP",
+        status,
+        f"HTTP returned {status_code}.",
+        details={"Status code": status_code},
+    )
+
+
 class AgentDiagnosticTests(unittest.TestCase):
     @patch.dict(os.environ, {}, clear=True)
     def test_requires_api_key_after_validating_target(self):
@@ -116,13 +126,7 @@ class AgentDiagnosticTests(unittest.TestCase):
     ):
         check_network.return_value = network_result()
         check_dns.return_value = dns_result()
-        check_http.return_value = make_result(
-            "http",
-            "HTTP",
-            "passed",
-            "HTTP returned 200.",
-            details={"Status code": 200},
-        )
+        check_http.return_value = http_result()
 
         def execute_agent(agent, input, context, max_turns, run_config):
             self.assertEqual(context.target["url"], "https://example.com/")
@@ -133,9 +137,12 @@ class AgentDiagnosticTests(unittest.TestCase):
             self.assertTrue(run_config.model_provider._use_responses)
             self.assertEqual(max_turns, 8)
             self.assertFalse(run_config.trace_include_sensitive_data)
+            self.assertNotIn(context.target["url"], input)
             context.inspect_http()
             return SimpleNamespace(
-                final_output=diagnosis(),
+                final_output=diagnosis().model_copy(
+                    update={"evidence": ["Invented model evidence."]}
+                ),
                 context_wrapper=SimpleNamespace(
                     usage=SimpleNamespace(
                         requests=2,
@@ -161,6 +168,15 @@ class AgentDiagnosticTests(unittest.TestCase):
         self.assertEqual(report["agent"]["max_checks"], 6)
         self.assertEqual(report["agent"]["model_calls"], 2)
         self.assertEqual(report["agent"]["token_usage"]["total"], 160)
+        self.assertEqual(
+            report["analysis"]["evidence"],
+            [
+                "Client Network: A network route is available.",
+                "DNS: Resolved one public address.",
+                "HTTP: HTTP returned 200.",
+            ],
+        )
+        self.assertNotIn("Invented model evidence.", str(report))
         run_sync.assert_called_once()
 
     @patch("diagnostics.agent_tools.check_tcp")
@@ -272,6 +288,255 @@ class AgentDiagnosticTests(unittest.TestCase):
         self.assertEqual(payload["locked_target"], "https://example.com/")
         self.assertEqual(context.requested_tools[0]["tool"], "client")
 
+    @patch("diagnostics.agent_tools.check_tls")
+    @patch("diagnostics.agent_tools.check_tcp")
+    @patch("diagnostics.agent_tools.check_dns")
+    @patch("diagnostics.agent_tools.check_client_network")
+    def test_http_target_skips_tls_and_its_dependencies(
+        self,
+        check_network,
+        check_dns,
+        check_tcp,
+        check_tls,
+    ):
+        context = DiagnosticContext(
+            target={
+                "url": "http://example.com/",
+                "hostname": "example.com",
+                "scheme": "http",
+                "port": None,
+            },
+            mode="local",
+        )
+
+        result = context.inspect_tls()
+
+        self.assertEqual(result["status"], "skipped")
+        self.assertEqual(context.checks_used, 1)
+        check_network.assert_not_called()
+        check_dns.assert_not_called()
+        check_tcp.assert_not_called()
+        check_tls.assert_not_called()
+
+    @patch("diagnostics.agent_tools.check_client_network")
+    @patch("diagnostics.agent.Runner.run_sync")
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    def test_unsupported_reachable_verdict_uses_fallback(
+        self,
+        run_sync,
+        check_network,
+    ):
+        check_network.return_value = network_result()
+
+        def execute_agent(agent, input, context, max_turns, run_config):
+            context.inspect_client()
+            return SimpleNamespace(final_output=diagnosis())
+
+        run_sync.side_effect = execute_agent
+
+        report = run_agent_diagnostics("example.com")
+
+        self.assertEqual(report["analysis"]["verdict"], "inconclusive")
+        self.assertEqual(report["agent"]["completion"], "fallback")
+
+    @patch("diagnostics.agent_tools.check_dns")
+    @patch("diagnostics.agent_tools.check_client_network")
+    @patch("diagnostics.agent.Runner.run_sync")
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    def test_unsupported_failure_stage_uses_fallback(
+        self,
+        run_sync,
+        check_network,
+        check_dns,
+    ):
+        check_network.return_value = network_result()
+        check_dns.return_value = dns_result()
+
+        def execute_agent(agent, input, context, max_turns, run_config):
+            context.inspect_dns()
+            return SimpleNamespace(
+                final_output=diagnosis("unreachable", "dns")
+            )
+
+        run_sync.side_effect = execute_agent
+
+        report = run_agent_diagnostics("example.com")
+
+        self.assertEqual(report["analysis"]["verdict"], "inconclusive")
+        self.assertIsNone(report["analysis"]["failure_stage"])
+        self.assertEqual(report["agent"]["completion"], "fallback")
+
+    @patch("diagnostics.agent.Runner.run_sync")
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    def test_clear_errors_reject_degraded_verdicts(self, run_sync):
+        cases = [
+            (
+                "dns",
+                make_result("dns", "DNS", "error", "DNS failed."),
+                "dns",
+            ),
+            (
+                "tcp",
+                make_result("tcp", "TCP", "error", "TCP failed."),
+                "tcp",
+            ),
+            (
+                "tls",
+                make_result("tls", "TLS", "error", "TLS failed."),
+                "tls",
+            ),
+            (
+                "http",
+                make_result("http", "HTTP", "error", "HTTP failed."),
+                "http",
+            ),
+            (
+                "http",
+                http_result("error", 503),
+                "application",
+            ),
+        ]
+
+        for key, tool_result, stage in cases:
+            with self.subTest(key=key, stage=stage):
+                def execute_agent(
+                    agent,
+                    input,
+                    context,
+                    max_turns,
+                    run_config,
+                ):
+                    context.results[key] = tool_result
+                    return SimpleNamespace(
+                        final_output=diagnosis("degraded", stage)
+                    )
+
+                run_sync.side_effect = execute_agent
+                report = run_agent_diagnostics("example.com")
+
+                self.assertEqual(report["analysis"]["verdict"], "inconclusive")
+                self.assertEqual(report["analysis"]["failure_stage"], stage)
+                self.assertEqual(report["agent"]["completion"], "fallback")
+
+    @patch("diagnostics.agent.Runner.run_sync")
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    def test_inconclusive_error_verdict_requires_matching_stage(self, run_sync):
+        dns_error = make_result("dns", "DNS", "error", "DNS failed.")
+
+        for reported_stage in (None, "tls"):
+            with self.subTest(reported_stage=reported_stage):
+                def execute_agent(
+                    agent,
+                    input,
+                    context,
+                    max_turns,
+                    run_config,
+                ):
+                    context.results["dns"] = dns_error
+                    return SimpleNamespace(
+                        final_output=diagnosis("inconclusive", reported_stage)
+                    )
+
+                run_sync.side_effect = execute_agent
+                report = run_agent_diagnostics("example.com")
+
+                self.assertEqual(report["analysis"]["failure_stage"], "dns")
+                self.assertEqual(report["agent"]["completion"], "fallback")
+
+        def execute_supported(agent, input, context, max_turns, run_config):
+            context.results["dns"] = dns_error
+            return SimpleNamespace(
+                final_output=diagnosis("inconclusive", "dns")
+            )
+
+        run_sync.side_effect = execute_supported
+        report = run_agent_diagnostics("example.com")
+
+        self.assertEqual(report["analysis"]["failure_stage"], "dns")
+        self.assertEqual(report["agent"]["completion"], "complete")
+
+    @patch("diagnostics.agent.Runner.run_sync")
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    def test_traceroute_error_does_not_support_unreachable(self, run_sync):
+        def execute_agent(agent, input, context, max_turns, run_config):
+            context.results["traceroute"] = make_result(
+                "traceroute",
+                "Traceroute",
+                "error",
+                "Route probe failed.",
+            )
+            return SimpleNamespace(
+                final_output=diagnosis("unreachable", "route")
+            )
+
+        run_sync.side_effect = execute_agent
+
+        report = run_agent_diagnostics("example.com")
+
+        self.assertEqual(report["analysis"]["verdict"], "inconclusive")
+        self.assertIsNone(report["analysis"]["failure_stage"])
+        self.assertEqual(report["agent"]["completion"], "fallback")
+
+    @patch("diagnostics.agent_tools.check_http")
+    @patch("diagnostics.agent_tools.check_dns")
+    @patch("diagnostics.agent_tools.check_client_network")
+    @patch("diagnostics.agent.Runner.run_sync")
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    def test_http_4xx_supports_degraded_application_verdict(
+        self,
+        run_sync,
+        check_network,
+        check_dns,
+        check_http,
+    ):
+        check_network.return_value = network_result()
+        check_dns.return_value = dns_result()
+        check_http.return_value = http_result("warning", 404)
+
+        def execute_agent(agent, input, context, max_turns, run_config):
+            context.inspect_http()
+            return SimpleNamespace(
+                final_output=diagnosis("degraded", "application")
+            )
+
+        run_sync.side_effect = execute_agent
+
+        report = run_agent_diagnostics("example.com")
+
+        self.assertEqual(report["status"], "warning")
+        self.assertEqual(report["analysis"]["failure_stage"], "application")
+        self.assertEqual(report["agent"]["completion"], "complete")
+
+    @patch("diagnostics.agent_tools.check_http")
+    @patch("diagnostics.agent_tools.check_dns")
+    @patch("diagnostics.agent_tools.check_client_network")
+    @patch("diagnostics.agent.Runner.run_sync")
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    def test_http_5xx_supports_unreachable_application_verdict(
+        self,
+        run_sync,
+        check_network,
+        check_dns,
+        check_http,
+    ):
+        check_network.return_value = network_result()
+        check_dns.return_value = dns_result()
+        check_http.return_value = http_result("error", 503)
+
+        def execute_agent(agent, input, context, max_turns, run_config):
+            context.inspect_http()
+            return SimpleNamespace(
+                final_output=diagnosis("unreachable", "application")
+            )
+
+        run_sync.side_effect = execute_agent
+
+        report = run_agent_diagnostics("example.com")
+
+        self.assertEqual(report["status"], "error")
+        self.assertEqual(report["analysis"]["failure_stage"], "application")
+        self.assertEqual(report["agent"]["completion"], "complete")
+
     @patch("diagnostics.agent.Runner.run_sync")
     @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
     def test_agent_failure_returns_safe_error(self, run_sync):
@@ -336,14 +601,17 @@ class AgentDiagnosticTests(unittest.TestCase):
             self.assertFalse(run_config.model_provider._use_responses)
             self.assertIsNone(agent.output_type)
             self.assertEqual(agent.model_settings.tool_choice, "auto")
-            self.assertIsNone(agent.model_settings.parallel_tool_calls)
+            self.assertFalse(agent.model_settings.parallel_tool_calls)
             self.assertEqual(
                 agent.model_settings.extra_args,
                 {"response_format": {"type": "json_object"}},
             )
             self.assertIn("valid JSON object", input)
+            self.assertNotIn(context.target["url"], input)
             context.inspect_client()
-            return SimpleNamespace(final_output=diagnosis().model_dump_json())
+            return SimpleNamespace(
+                final_output=diagnosis(verdict="inconclusive").model_dump_json()
+            )
 
         run_sync.side_effect = execute_agent
 
@@ -376,7 +644,7 @@ class AgentDiagnosticTests(unittest.TestCase):
             self.assertFalse(agent.model_settings.parallel_tool_calls)
             self.assertIsNone(agent.model_settings.extra_args)
             context.inspect_client()
-            return SimpleNamespace(final_output=diagnosis())
+            return SimpleNamespace(final_output=diagnosis(verdict="inconclusive"))
 
         run_sync.side_effect = execute_agent
 
@@ -424,11 +692,20 @@ class AgentDiagnosticTests(unittest.TestCase):
         },
         clear=True,
     )
-    def test_agent_rejects_retired_deepseek_model_names(self, run_sync):
-        with self.assertRaisesRegex(AgentConfigurationError, "retired"):
-            run_agent_diagnostics("example.com")
+    def test_agent_does_not_hardcode_provider_model_names(self, run_sync):
+        def execute_agent(agent, input, context, max_turns, run_config):
+            self.assertEqual(agent.model, "deepseek-chat")
+            context.results["client"] = network_result()
+            return SimpleNamespace(
+                final_output=diagnosis(verdict="inconclusive").model_dump_json()
+            )
 
-        run_sync.assert_not_called()
+        run_sync.side_effect = execute_agent
+
+        report = run_agent_diagnostics("example.com")
+
+        self.assertEqual(report["agent"]["model"], "deepseek-chat")
+        run_sync.assert_called_once()
 
 
 if __name__ == "__main__":

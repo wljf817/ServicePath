@@ -1,8 +1,13 @@
 import ipaddress
+import re
 from urllib.parse import urlsplit, urlunsplit
 
 
 PROXY_FAKE_IP_NETWORK = ipaddress.ip_network("198.18.0.0/15")
+HOST_LABEL_PATTERN = re.compile(
+    r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z",
+    re.IGNORECASE,
+)
 
 
 class TargetError(ValueError):
@@ -11,6 +16,9 @@ class TargetError(ValueError):
 
 def normalize_target(value):
     """Return a safe, normalized HTTP target as a dictionary."""
+    if not isinstance(value, str):
+        raise TargetError("Please enter a website or domain.")
+
     value = value.strip()
 
     if not value:
@@ -18,33 +26,39 @@ def normalize_target(value):
 
     if len(value) > 2048:
         raise TargetError("The website address is too long.")
+    if "\\" in value or any(
+        character.isspace() or ord(character) < 32 or ord(character) == 127
+        for character in value
+    ):
+        raise TargetError("The website address is invalid.")
 
     if "://" not in value:
         value = "https://" + value
 
-    parsed = urlsplit(value)
+    try:
+        parsed = urlsplit(value)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError as error:
+        raise TargetError("Please enter a valid website or domain.") from error
 
     if parsed.scheme.lower() not in {"http", "https"}:
         raise TargetError("Only http:// and https:// websites are supported.")
 
-    if parsed.username or parsed.password:
-        raise TargetError("Website addresses with usernames or passwords are not allowed.")
+    if parsed.username is not None or parsed.password is not None:
+        raise TargetError(
+            "Website addresses with usernames or passwords are not allowed."
+        )
 
-    if not parsed.hostname:
+    if not hostname:
         raise TargetError("Please enter a valid website or domain.")
 
-    try:
-        port = parsed.port
-    except ValueError as error:
-        raise TargetError("The website port is invalid.") from error
+    if parsed.netloc.endswith(":"):
+        raise TargetError("The website port is invalid.")
+    if port is not None and not 1 <= port <= 65535:
+        raise TargetError("The website port is invalid.")
 
-    hostname = parsed.hostname.rstrip(".").lower()
-
-    try:
-        hostname = hostname.encode("idna").decode("ascii")
-    except UnicodeError as error:
-        raise TargetError("The domain name is invalid.") from error
-
+    hostname = normalize_hostname(hostname)
     validate_hostname(hostname)
 
     netloc = hostname
@@ -65,8 +79,45 @@ def normalize_target(value):
     }
 
 
+def normalize_hostname(hostname):
+    """Return a canonical hostname after strict syntax validation."""
+    hostname = hostname.lower()
+    if hostname.endswith("."):
+        hostname = hostname[:-1]
+    if not hostname or "%" in hostname:
+        raise TargetError("The domain name is invalid.")
+
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        try:
+            hostname = hostname.encode("idna").decode("ascii")
+        except UnicodeError as error:
+            raise TargetError("The domain name is invalid.") from error
+
+        if len(hostname) > 253:
+            raise TargetError("The domain name is invalid.")
+
+        labels = hostname.split(".")
+        if not labels or any(
+            not HOST_LABEL_PATTERN.fullmatch(label) for label in labels
+        ):
+            raise TargetError("The domain name is invalid.")
+
+        for label in labels:
+            if not label.startswith("xn--"):
+                continue
+            try:
+                label.encode("ascii").decode("idna")
+            except UnicodeError as error:
+                raise TargetError("The domain name is invalid.") from error
+        return hostname
+
+    return address.compressed
+
+
 def validate_hostname(hostname):
-    """Reject local names and literal IP addresses that are not public."""
+    """Reject local names and literal addresses that are not public."""
     local_suffixes = (".local", ".localhost", ".internal", ".lan", ".home")
 
     if hostname == "localhost" or hostname.endswith(local_suffixes):
@@ -78,7 +129,14 @@ def validate_hostname(hostname):
         return
 
     if not address.is_global:
-        raise TargetError("Private, loopback, and reserved IP addresses are not allowed.")
+        raise TargetError(
+            "Private, loopback, and reserved IP addresses are not allowed."
+        )
+
+
+def effective_port(target):
+    """Return the explicit port or the default for the target scheme."""
+    return target["port"] or {"http": 80, "https": 443}[target["scheme"]]
 
 
 def is_proxy_fake_address(value):
@@ -103,4 +161,6 @@ def validate_public_addresses(addresses, allow_proxy_fake_ip=False):
 
         proxy_fake_ip = allow_proxy_fake_ip and is_proxy_fake_address(value)
         if not address.is_global and not proxy_fake_ip:
-            raise TargetError("The domain resolves to a private or reserved IP address.")
+            raise TargetError(
+                "The domain resolves to a private or reserved IP address."
+            )

@@ -1,11 +1,11 @@
 import unittest
 from unittest.mock import patch
 
+from diagnostics.agent_tools import DiagnosticContext
 from diagnostics.dns import check_dns
 from diagnostics.http import check_http
 from diagnostics.network import check_client_network
 from diagnostics.result import make_result
-from diagnostics.runner import run_diagnostics
 
 
 TARGET = {
@@ -48,17 +48,13 @@ class ProxyDiagnosticTests(unittest.TestCase):
         self.assertTrue(result["proxy_detected"])
         self.assertEqual(result["details"]["Proxy"], "http")
 
-    @patch("diagnostics.runner.check_http")
-    @patch("diagnostics.runner.check_tls")
-    @patch("diagnostics.runner.check_tcp")
-    @patch("diagnostics.runner.check_dns")
-    @patch("diagnostics.runner.check_client_network")
-    def test_local_test_uses_proxy_for_fake_ip(
+    @patch("diagnostics.agent_tools.check_http")
+    @patch("diagnostics.agent_tools.check_dns")
+    @patch("diagnostics.agent_tools.check_client_network")
+    def test_agent_context_uses_proxy_for_fake_ip(
         self,
         client_network,
         dns,
-        tcp,
-        tls,
         http,
     ):
         network_result = make_result(
@@ -86,24 +82,26 @@ class ProxyDiagnosticTests(unittest.TestCase):
             "HTTP passed.",
         )
 
-        report = run_diagnostics("example.com", mode="local")
+        context = DiagnosticContext(TARGET, mode="local")
+        result = context.inspect_http()
 
-        self.assertEqual(
-            [layer["status"] for layer in report["layers"]],
-            ["warning", "warning", "skipped", "skipped", "passed"],
-        )
-        tcp.assert_not_called()
-        tls.assert_not_called()
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(set(context.results), {"client", "dns", "http"})
         http.assert_called_once_with(
-            report["target"],
+            TARGET,
             use_proxy=True,
             allow_proxy_fake_ip=True,
         )
 
-    @patch("diagnostics.runner.check_http")
-    @patch("diagnostics.runner.check_dns")
-    @patch("diagnostics.runner.check_client_network")
-    def test_remote_test_uses_detected_proxy(self, client_network, dns, http):
+    @patch("diagnostics.agent_tools.check_http")
+    @patch("diagnostics.agent_tools.check_dns")
+    @patch("diagnostics.agent_tools.check_client_network")
+    def test_agent_context_uses_detected_proxy_for_public_dns(
+        self,
+        client_network,
+        dns,
+        http,
+    ):
         network_result = make_result(
             "client",
             "Client Network",
@@ -116,11 +114,11 @@ class ProxyDiagnosticTests(unittest.TestCase):
         dns_result = make_result(
             "dns",
             "DNS",
-            "warning",
-            "Fake-IP detected.",
-            details={"addresses": ["198.18.0.10"]},
+            "passed",
+            "Resolved one public address.",
+            details={"addresses": ["93.184.216.34"]},
         )
-        dns_result["proxy_fake_ip"] = True
+        dns_result["proxy_fake_ip"] = False
         dns.return_value = dns_result
         http.return_value = make_result(
             "http",
@@ -129,13 +127,13 @@ class ProxyDiagnosticTests(unittest.TestCase):
             "HTTP passed.",
         )
 
-        report = run_diagnostics("example.com", mode="remote")
+        context = DiagnosticContext(TARGET, mode="remote")
+        context.inspect_http()
 
         self.assertTrue(dns.call_args.kwargs["allow_proxy_fake_ip"])
         http.assert_called_once_with(
-            report["target"],
+            TARGET,
             use_proxy=True,
-            allow_proxy_fake_ip=True,
         )
 
     @patch("diagnostics.http.resolve_addresses")

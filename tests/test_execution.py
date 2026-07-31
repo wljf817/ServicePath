@@ -12,6 +12,22 @@ def settings(role, remote_url=""):
 
 
 class ExecutionTests(unittest.TestCase):
+    def test_rejects_unknown_mode_before_dispatch(self):
+        with self.assertRaisesRegex(ExecutionError, "Local Test"):
+            run_selected_diagnostics(
+                "example.com",
+                "unexpected",
+                settings("local_device"),
+            )
+
+    def test_rejects_unknown_instance_role(self):
+        with self.assertRaisesRegex(ExecutionError, "instance role"):
+            run_selected_diagnostics(
+                "example.com",
+                "remote",
+                settings("unexpected"),
+            )
+
     @patch("diagnostics.execution.run_agent_diagnostics")
     def test_remote_server_runs_remote_test_on_current_server(self, run_agent):
         run_agent.return_value = {"mode": "remote"}

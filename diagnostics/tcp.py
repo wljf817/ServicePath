@@ -2,6 +2,7 @@ import socket
 from time import perf_counter
 
 from diagnostics.result import make_result
+from diagnostics.target import effective_port
 
 
 def _connect(address, port, timeout):
@@ -10,7 +11,11 @@ def _connect(address, port, timeout):
     connection.settimeout(timeout)
 
     try:
-        destination = (address, port, 0, 0) if family == socket.AF_INET6 else (address, port)
+        destination = (
+            (address, port, 0, 0)
+            if family == socket.AF_INET6
+            else (address, port)
+        )
         connection.connect(destination)
         return True, None
     except OSError as error:
@@ -21,40 +26,34 @@ def _connect(address, port, timeout):
 
 def check_tcp(target, addresses, timeout=3):
     started = perf_counter()
-    ports = [target["port"]] if target["port"] else [80, 443]
+    port = effective_port(target)
     port_results = {}
 
-    for port in ports:
-        port_started = perf_counter()
-        connected_address = None
-        last_error = "Connection failed"
+    port_started = perf_counter()
+    connected_address = None
+    last_error = "Connection failed"
 
-        for address in addresses:
-            connected, error = _connect(address, port, timeout)
-            if connected:
-                connected_address = address
-                break
-            if error:
-                last_error = error
+    for address in addresses:
+        connected, error = _connect(address, port, timeout)
+        if connected:
+            connected_address = address
+            break
+        if error:
+            last_error = error
 
-        port_results[str(port)] = {
-            "status": "passed" if connected_address else "error",
-            "address": connected_address,
-            "time_ms": round((perf_counter() - port_started) * 1000),
-            "error": None if connected_address else last_error,
-        }
+    port_results[str(port)] = {
+        "status": "passed" if connected_address else "error",
+        "address": connected_address,
+        "time_ms": round((perf_counter() - port_started) * 1000),
+        "error": None if connected_address else last_error,
+    }
 
-    passed_ports = [port for port, result in port_results.items() if result["status"] == "passed"]
-
-    if len(passed_ports) == len(port_results):
+    if connected_address:
         status = "passed"
-        summary = "TCP connection succeeded on " + ", ".join(passed_ports) + "."
-    elif passed_ports:
-        status = "warning"
-        summary = "Only TCP port(s) " + ", ".join(passed_ports) + " accepted a connection."
+        summary = f"TCP connection succeeded on port {port}."
     else:
         status = "error"
-        summary = "No tested TCP port accepted a connection."
+        summary = f"TCP port {port} did not accept a connection."
 
     duration = round((perf_counter() - started) * 1000)
     return make_result(

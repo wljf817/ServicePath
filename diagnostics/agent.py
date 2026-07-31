@@ -1,7 +1,6 @@
 import os
 from datetime import datetime, timezone
 from time import perf_counter
-from urllib.parse import urlsplit
 
 from agents import (
     Agent,
@@ -22,7 +21,7 @@ from openai import (
     RateLimitError,
 )
 
-from app_settings import (
+from servicepath.settings import (
     SettingsError,
     validate_openai_api_mode,
     validate_openai_base_url,
@@ -91,7 +90,16 @@ def _report_status(verdict):
     }[verdict]
 
 
-def _analysis_payload(diagnosis, model, completion):
+def _tool_evidence(context):
+    """Build display evidence only from trusted tool results."""
+    return [
+        f"{context.results[key]['name']}: {context.results[key]['summary']}"[:500]
+        for key in CHECK_ORDER
+        if key in context.results
+    ][:8]
+
+
+def _analysis_payload(diagnosis, model, completion, context):
     return {
         "source": "agent",
         "model": model,
@@ -101,7 +109,7 @@ def _analysis_payload(diagnosis, model, completion):
         "text": diagnosis.summary,
         "failure_stage": diagnosis.failure_stage,
         "confidence": diagnosis.confidence,
-        "evidence": diagnosis.evidence,
+        "evidence": _tool_evidence(context),
         "causes": diagnosis.likely_causes,
         "actions": diagnosis.actions,
     }
@@ -150,7 +158,7 @@ def _build_report(
         "first_problem": first_problem,
         "layers": layers,
         "traceroute": traceroute,
-        "analysis": _analysis_payload(diagnosis, model, completion),
+        "analysis": _analysis_payload(diagnosis, model, completion, context),
         "agent": {
             "model": model,
             "api_mode": api_mode,
@@ -174,9 +182,6 @@ def _resolve_api_mode(base_url):
 
 
 def _provider_label(base_url):
-    hostname = (urlsplit(base_url).hostname or "").lower() if base_url else ""
-    if hostname == "api.deepseek.com" or hostname.endswith(".deepseek.com"):
-        return "DeepSeek"
     if not base_url:
         return "OpenAI"
     return "The configured model provider"
@@ -253,18 +258,8 @@ def _parse_diagnosis(value):
 
 
 def _fallback_diagnosis(context):
-    failure_stage = None
-    for key in CHECK_ORDER:
-        result = context.results.get(key)
-        if result and result.get("status") == "error":
-            failure_stage = "route" if key == "traceroute" else key
-            break
+    _, failure_stage = _observed_problem(context)
 
-    evidence = [
-        f"{context.results[key]['name']}: {context.results[key]['summary']}"
-        for key in CHECK_ORDER
-        if key in context.results
-    ][:8]
     return AgentDiagnosis(
         verdict="inconclusive",
         headline="Evidence was collected, but the Agent could not finish",
@@ -274,10 +269,79 @@ def _fallback_diagnosis(context):
         ),
         failure_stage=failure_stage,
         confidence="low",
-        evidence=evidence,
+        evidence=_tool_evidence(context),
         likely_causes=[],
         actions=["Review the collected evidence and retry the investigation."],
     )
+
+
+def _http_status_code(context):
+    details = context.results.get("http", {}).get("details", {})
+    status_code = details.get("Status code")
+    if isinstance(status_code, int) and not isinstance(status_code, bool):
+        if 100 <= status_code <= 599:
+            return status_code
+    return None
+
+
+def _observed_problem(context):
+    """Return the severity and stage supported by tool evidence."""
+    for key in ("client", "dns", "tcp", "tls", "http"):
+        result = context.results.get(key)
+        if not result:
+            continue
+
+        status = result.get("status")
+        if key == "http":
+            status_code = _http_status_code(context)
+            if status_code is not None and status_code >= 500:
+                return "error", "application"
+            if status_code is not None and status_code >= 400:
+                continue
+            if status == "error":
+                return "error", "http"
+        elif status == "error":
+            return "error", key
+
+    tls_result = context.results.get("tls", {})
+    if tls_result.get("status") == "warning":
+        return "warning", "tls"
+
+    status_code = _http_status_code(context)
+    if status_code is not None and 400 <= status_code <= 499:
+        return "warning", "application"
+
+    return None, None
+
+
+def _diagnosis_is_supported(diagnosis, context):
+    """Match the model verdict to a conservative evidence matrix."""
+    severity, stage = _observed_problem(context)
+
+    if severity == "error":
+        return (
+            diagnosis.failure_stage == stage
+            and diagnosis.verdict in {"unreachable", "inconclusive"}
+        )
+
+    if severity == "warning":
+        return (
+            diagnosis.failure_stage == stage
+            and diagnosis.verdict in {"degraded", "inconclusive"}
+        )
+
+    http_result = context.results.get("http", {})
+    has_success_response = (
+        http_result.get("status") == "passed"
+        and _http_status_code(context) is not None
+    )
+    if has_success_response:
+        return (
+            diagnosis.failure_stage is None
+            and diagnosis.verdict in {"reachable", "inconclusive"}
+        )
+
+    return diagnosis.verdict == "inconclusive" and diagnosis.failure_stage is None
 
 
 def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
@@ -297,14 +361,6 @@ def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
         raise AgentConfigurationError(str(error)) from error
 
     model = os.getenv("OPENAI_MODEL", "gpt-5.6").strip() or "gpt-5.6"
-    if (
-        _provider_label(base_url) == "DeepSeek"
-        and model in {"deepseek-chat", "deepseek-reasoner"}
-    ):
-        raise AgentConfigurationError(
-            "DeepSeek retired the deepseek-chat and deepseek-reasoner model "
-            "names. Use deepseek-v4-flash or deepseek-v4-pro in Settings."
-        )
 
     use_responses = api_mode == "responses"
     model_provider = OpenAIProvider(
@@ -323,7 +379,7 @@ def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
         model=model,
         model_settings=ModelSettings(
             tool_choice="required" if use_responses else "auto",
-            parallel_tool_calls=False if use_responses else None,
+            parallel_tool_calls=False,
             extra_args=(
                 None
                 if use_responses
@@ -335,9 +391,8 @@ def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
         reset_tool_choice=True,
     )
     prompt = (
-        f"Investigate the locked target {target['url']} from the {mode} "
-        "ServicePath runtime. Select and use the available tools, then return "
-        "the structured diagnosis."
+        "Investigate the server-locked target from this ServicePath runtime. "
+        "Select and use the available tools, then return the structured diagnosis."
     )
     if not use_responses:
         prompt = f"{prompt}\n\n{CHAT_COMPLETIONS_OUTPUT_INSTRUCTIONS}"
@@ -399,6 +454,11 @@ def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
             "The diagnostic agent finished without collecting network evidence."
         )
 
+    completion = "complete"
+    if not _diagnosis_is_supported(diagnosis, context):
+        diagnosis = _fallback_diagnosis(context)
+        completion = "fallback"
+
     duration_ms = round((perf_counter() - started) * 1000)
     return _build_report(
         target,
@@ -409,4 +469,5 @@ def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
         context,
         duration_ms,
         result,
+        completion=completion,
     )

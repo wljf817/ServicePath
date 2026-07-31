@@ -6,11 +6,20 @@ from time import perf_counter
 import certifi
 
 from diagnostics.result import make_result
+from diagnostics.target import effective_port
 
 
 def check_tls(target, addresses, tcp_result, timeout=4):
+    if target["scheme"] != "https":
+        return make_result(
+            "tls",
+            "TLS",
+            "skipped",
+            "TLS does not apply to an HTTP target.",
+        )
+
     started = perf_counter()
-    port = target["port"] if target["scheme"] == "https" and target["port"] else 443
+    port = effective_port(target)
     tcp_port = tcp_result["details"]["ports"].get(str(port), {})
 
     if tcp_port.get("status") != "passed":
@@ -35,7 +44,10 @@ def check_tls(target, addresses, tcp_result, timeout=4):
 
         try:
             raw_socket = socket.create_connection((address, port), timeout=timeout)
-            secure_socket = context.wrap_socket(raw_socket, server_hostname=target["hostname"])
+            secure_socket = context.wrap_socket(
+                raw_socket,
+                server_hostname=target["hostname"],
+            )
             certificate = secure_socket.getpeercert()
             expires_text = certificate.get("notAfter")
             expires_at = datetime.fromtimestamp(

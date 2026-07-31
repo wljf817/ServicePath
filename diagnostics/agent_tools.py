@@ -148,6 +148,16 @@ class DiagnosticContext:
         return self._run_check("tcp", operation)
 
     def inspect_tls(self):
+        if self.target["scheme"] != "https":
+            return self._run_check(
+                "tls",
+                lambda: skipped_result(
+                    "tls",
+                    "TLS",
+                    "TLS does not apply to an HTTP target.",
+                ),
+            )
+
         dns_result = self.inspect_dns()
         tcp_result = self.inspect_tcp()
 

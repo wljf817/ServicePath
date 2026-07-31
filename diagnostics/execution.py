@@ -8,7 +8,13 @@ class ExecutionError(RuntimeError):
 
 
 def run_selected_diagnostics(target, mode, settings):
+    if not isinstance(mode, str) or mode not in {"local", "remote", "compare"}:
+        raise ExecutionError("Please select Local Test, Remote Test, or Compare Both.")
+
     role = settings["instance_role"]
+
+    if role not in {"remote_server", "local_device"}:
+        raise ExecutionError("ServicePath has an invalid instance role.")
 
     if role == "remote_server":
         if mode == "remote":
