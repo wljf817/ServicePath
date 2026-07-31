@@ -1,12 +1,6 @@
 import {useEffect, useState} from "react";
 
-const checkLabels = [
-    "planning the next useful check",
-    "running a bounded network tool",
-    "reviewing returned evidence",
-    "deciding whether more evidence is needed",
-    "preparing the final diagnosis",
-];
+import {runtimeState} from "../domain/diagnostics";
 
 const modeLabels = {
     local: "Local device",
@@ -14,48 +8,52 @@ const modeLabels = {
     compare: "Local and remote",
 };
 
-export default function ScanProgress({loading, mode}) {
+export default function ScanProgress({loading = false, mode, state}) {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const currentState = runtimeState(state, loading);
+    const running = currentState === "running";
 
     useEffect(() => {
-        if (!loading) {
+        if (!running) {
             setElapsedSeconds(0);
             return undefined;
         }
 
-        const timer = window.setInterval(() => {
-            setElapsedSeconds((seconds) => seconds + 1);
-        }, 1000);
+        const startedAt = window.performance.now();
+        let timer = null;
+        const updateElapsedTime = () => {
+            const elapsedMs = window.performance.now() - startedAt;
+            setElapsedSeconds(Math.floor(elapsedMs / 1000));
+            timer = window.setTimeout(
+                updateElapsedTime,
+                Math.max(16, 1000 - (elapsedMs % 1000)),
+            );
+        };
 
-        return () => window.clearInterval(timer);
-    }, [loading]);
+        updateElapsedTime();
+        return () => window.clearTimeout(timer);
+    }, [running]);
 
-    if (!loading) {
+    if (!running) {
         return null;
     }
 
-    const checkIndex = Math.floor(elapsedSeconds / 2) % checkLabels.length;
-    const currentCheck = checkLabels[checkIndex];
     const locationLabel = modeLabels[mode] || "Diagnostic service";
 
     return (
-        <div className="scan-progress">
+        <div className="scan-progress" data-state={currentState}>
             <div className="scan-progress-orb" aria-hidden="true">
                 <span />
             </div>
 
             <div className="scan-progress-copy">
                 <span className="scan-progress-location">{locationLabel}</span>
-                <p
-                    className="scan-progress-announcement"
-                    aria-atomic="true"
-                    aria-live="polite"
-                >
-                    Agent is {currentCheck}
+                <p aria-atomic="true" className="scan-progress-announcement" role="status">
+                    Investigation in progress
                 </p>
             </div>
 
-            <time className="scan-progress-time">
+            <time className="scan-progress-time" dateTime={`PT${elapsedSeconds}S`}>
                 {elapsedSeconds}s elapsed
             </time>
 

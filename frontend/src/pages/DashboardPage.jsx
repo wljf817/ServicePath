@@ -1,12 +1,12 @@
-import {Button, Card, Input, Spinner} from "@heroui/react";
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 
-import {startDiagnosis} from "../api";
 import DiagnosticConsole from "../components/DiagnosticConsole";
 import {ArrowIcon, GlobeIcon} from "../components/Icons";
 import LayerList from "../components/LayerList";
 import NetworkPathVisual from "../components/NetworkPathVisual";
 import ScanProgress from "../components/ScanProgress";
+import Panel from "../components/ui/Panel";
+import Spinner from "../components/ui/Spinner";
 
 const modes = [
     {value: "local", title: "Local Test", description: "This device and network"},
@@ -14,45 +14,87 @@ const modes = [
     {value: "compare", title: "Compare Both", description: "Local and remote side by side"},
 ];
 
-export default function DashboardPage({appSettings, navigate}) {
+export default function DashboardPage({
+    appSettings,
+    diagnosis,
+    onChange,
+    onReconcileSettings,
+    onRetrySettings,
+    onStartDiagnosis,
+    settingsError,
+    settingsSaveBlocking,
+    settingsSaveError,
+    settingsSaveStatus,
+    settingsStatus,
+}) {
+    const settingsSaving = settingsSaveStatus === "saving";
+    const settingsReady = (
+        settingsStatus === "ready"
+        && settingsSaveStatus !== "saving"
+        && !(settingsSaveStatus === "error" && settingsSaveBlocking)
+    );
     const role = appSettings?.settings.instance_role || "remote_server";
-    const [domain, setDomain] = useState("");
-    const [mode, setMode] = useState("remote");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
+    const configuredRoleRef = useRef(null);
+    const [domain, setDomain] = useState(diagnosis.target || "");
+    const [mode, setMode] = useState(diagnosis.mode || "remote");
+    const runState = diagnosis.status === "complete" ? "idle" : diagnosis.status;
+    const error = diagnosis.error;
+    const loading = runState === "running";
     const requiresLocalAgent = role === "remote_server" || mode !== "remote";
-    const agentConfigured = appSettings?.agent_configured ?? appSettings?.ai_configured;
+    const agentConfigured = appSettings?.agent_configured;
     const agentUnavailable = Boolean(
-        appSettings && requiresLocalAgent && !agentConfigured,
+        settingsReady && requiresLocalAgent && !agentConfigured,
     );
 
     useEffect(() => {
-        setMode(role === "remote_server" ? "remote" : "local");
-    }, [role]);
+        if (!settingsReady || configuredRoleRef.current === role) {
+            return;
+        }
+
+        configuredRoleRef.current = role;
+        if (["complete", "idle"].includes(diagnosis.status)) {
+            setMode(role === "remote_server" ? "remote" : "local");
+        }
+    }, [diagnosis.status, role, settingsReady]);
+
+    useEffect(() => {
+        if (diagnosis.status === "running") {
+            setDomain(diagnosis.target);
+            setMode(diagnosis.mode);
+        } else if (diagnosis.status === "error" && settingsReady) {
+            const nextMode = modeDisabled(diagnosis.mode)
+                ? (role === "remote_server" ? "remote" : "local")
+                : diagnosis.mode;
+            setDomain(diagnosis.target);
+            setMode(nextMode);
+            if (nextMode !== diagnosis.mode) {
+                onChange();
+            }
+        }
+    }, [diagnosis.mode, diagnosis.status, diagnosis.target, onChange, role, settingsReady]);
 
     function modeDisabled(value) {
-        return role === "remote_server" && value !== "remote";
+        return !settingsReady || (role === "remote_server" && value !== "remote");
     }
 
-    async function submit(event) {
+    function submit(event) {
         event.preventDefault();
-        setError("");
-        setLoading(true);
-
-        try {
-            const result = await startDiagnosis(domain, mode);
-            navigate(result.report_url, {preserveScroll: true});
-        } catch (requestError) {
-            setError(requestError.message);
-            setLoading(false);
+        if (
+            loading
+            || !settingsReady
+            || agentUnavailable
+            || modeDisabled(mode)
+        ) {
+            return;
         }
+        onStartDiagnosis(domain, mode);
     }
 
     return (
         <>
-            <section className="hero-section dashboard-hero">
+            <section className="dashboard-hero" data-state={runState}>
                 <div className="hero-copy">
-                    <span className="hero-pill"><i /> Agent-guided website diagnostics</span>
+                    <span className="hero-pill"><i aria-hidden="true" /> Agent-guided website diagnostics</span>
                     <h1>Let one agent investigate <span>what actually failed.</span></h1>
                     <p>
                         Give ServicePath a public website. Its bounded diagnostic agent
@@ -65,12 +107,12 @@ export default function DashboardPage({appSettings, navigate}) {
                         <span><strong>RAW</strong> evidence retained</span>
                     </div>
                 </div>
-                <NetworkPathVisual loading={loading} />
+                <NetworkPathVisual state={runState} />
             </section>
 
-            <Card className="diagnostic-card">
-                <Card.Content>
-                    <form onSubmit={submit}>
+            <Panel className="diagnostic-card" data-state={runState}>
+                <Panel.Content>
+                    <form onChange={onChange} onSubmit={submit}>
                         <div className="form-heading">
                             <div>
                                 <span className="section-kicker">NEW TRACE</span>
@@ -78,7 +120,9 @@ export default function DashboardPage({appSettings, navigate}) {
                                 <p>Enter a public website. The agent decides which checks are worth running.</p>
                             </div>
                             <span className="role-chip">
-                                {role === "remote_server" ? "Remote server" : "Local device"}
+                                {settingsReady
+                                    ? (role === "remote_server" ? "Remote server" : "Local device")
+                                    : "Configuration pending"}
                             </span>
                         </div>
 
@@ -86,30 +130,69 @@ export default function DashboardPage({appSettings, navigate}) {
                         <div className="domain-row">
                             <div className="domain-input-wrap">
                                 <GlobeIcon size={19} />
-                                <Input
+                                <input
                                     autoComplete="off"
                                     className="domain-input"
+                                    disabled={loading || !settingsReady}
                                     id="domain"
                                     onChange={(event) => setDomain(event.target.value)}
                                     placeholder="example.com"
                                     required
+                                    spellCheck="false"
+                                    type="text"
                                     value={domain}
-                                    variant="secondary"
                                 />
                             </div>
-                            <Button
+                            <button
+                                aria-busy={loading}
                                 className="start-button"
-                                isDisabled={loading || agentUnavailable}
-                                isPending={loading}
-                                size="lg"
+                                disabled={loading || agentUnavailable || !settingsReady || modeDisabled(mode)}
                                 type="submit"
-                                variant="primary"
                             >
-                                {loading ? <Spinner color="current" size="sm" /> : <ArrowIcon size={19} />}
+                                {loading ? <Spinner size="sm" /> : <ArrowIcon size={19} />}
                                 {loading ? "Agent investigating" : "Start investigation"}
-                            </Button>
+                            </button>
                         </div>
 
+                        {settingsStatus === "loading" && (
+                            <p className="configuration-message" role="status">
+                                Loading application settings...
+                            </p>
+                        )}
+                        {settingsSaving && (
+                            <p className="configuration-message" role="status">
+                                Applying application settings...
+                            </p>
+                        )}
+                        {settingsSaveStatus === "error" && (
+                            <div className="form-error">
+                                <span role="alert">
+                                    {settingsSaveError || "Application settings were not saved."}
+                                </span>
+                                {settingsSaveBlocking ? (
+                                    <button
+                                        className="inline-action"
+                                        disabled={settingsStatus === "loading"}
+                                        onClick={onReconcileSettings}
+                                        type="button"
+                                    >
+                                        Reload saved configuration
+                                    </button>
+                                ) : (
+                                    <span> The last saved configuration is still active.</span>
+                                )}
+                            </div>
+                        )}
+                        {settingsStatus === "error" && (
+                            <div className="form-error">
+                                <span role="alert">
+                                    {settingsError || "Application settings could not be loaded."}
+                                </span>
+                                <button className="inline-action" onClick={onRetrySettings} type="button">
+                                    Try again
+                                </button>
+                            </div>
+                        )}
                         {agentUnavailable && (
                             <p className="form-error" role="alert">
                                 The diagnostic agent needs an API key. Configure it in Settings before running this location.
@@ -140,10 +223,10 @@ export default function DashboardPage({appSettings, navigate}) {
                                                 <strong>{item.title}</strong>
                                                 <small>{item.description}</small>
                                             </span>
-                                            {disabled ? (
+                                            {settingsReady && disabled ? (
                                                 <span className="mode-unavailable">Unavailable</span>
                                             ) : (
-                                                <span className="mode-radio"><i /></span>
+                                                <span aria-hidden="true" className="mode-radio"><i /></span>
                                             )}
                                         </label>
                                     );
@@ -151,13 +234,13 @@ export default function DashboardPage({appSettings, navigate}) {
                             </div>
                         </fieldset>
 
-                        <ScanProgress loading={loading} mode={mode} />
+                        <ScanProgress mode={mode} state={runState} />
                     </form>
-                </Card.Content>
-            </Card>
+                </Panel.Content>
+            </Panel>
 
-            <section className="dashboard-grid">
-                <DiagnosticConsole loading={loading} />
+            <section aria-busy={loading} className="dashboard-grid" data-state={runState}>
+                <DiagnosticConsole state={runState} />
                 <LayerList />
             </section>
         </>

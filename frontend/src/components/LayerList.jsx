@@ -1,50 +1,12 @@
-import {Card} from "@heroui/react";
-
+import {detailLines, DIAGNOSTIC_TOOLS, reportLayers, toolNumber} from "../domain/diagnostics";
 import {ChevronIcon, ClockIcon} from "./Icons";
 import StatusBadge from "./StatusBadge";
-
-const availableTools = [
-    {key: "client", name: "Client Network"},
-    {key: "dns", name: "DNS"},
-    {key: "traceroute", name: "Traceroute"},
-    {key: "tcp", name: "TCP"},
-    {key: "tls", name: "TLS"},
-    {key: "http", name: "HTTP"},
-];
-
-const layerNumbers = {
-    client: "01",
-    dns: "02",
-    traceroute: "TR",
-    tcp: "03",
-    tls: "04",
-    http: "05",
-};
-
-function detailLines(value, prefix = "") {
-    const lines = [];
-
-    Object.entries(value || {}).forEach(([key, item]) => {
-        const label = prefix ? `${prefix} > ${key}` : key;
-        if (item && typeof item === "object" && !Array.isArray(item)) {
-            lines.push(...detailLines(item, label));
-        } else {
-            const display = Array.isArray(item) ? item.join(", ") || "None" : String(item);
-            lines.push({label, display});
-        }
-    });
-
-    return lines;
-}
+import Panel from "./ui/Panel";
 
 export default function LayerList({report}) {
     const layers = report
-        ? (report.layers || []).flatMap((layer) => (
-            layer.key === "dns" && report.traceroute
-                ? [layer, report.traceroute]
-                : [layer]
-        ))
-        : availableTools.map((layer) => ({
+        ? reportLayers(report)
+        : DIAGNOSTIC_TOOLS.map((layer) => ({
             ...layer,
             status: "waiting",
             summary: "Available to the diagnostic agent",
@@ -55,26 +17,26 @@ export default function LayerList({report}) {
     ));
 
     return (
-        <Card className="layers-panel" variant="secondary">
-            <Card.Header className="panel-header">
+        <Panel className="layers-panel">
+            <Panel.Header className="panel-header">
                 <div>
                     <span className="section-kicker">ADAPTIVE TOOL SELECTION</span>
-                    <Card.Title className="panel-title">Collected evidence</Card.Title>
+                    <Panel.Title className="panel-title">Collected evidence</Panel.Title>
                 </div>
-            </Card.Header>
-            <Card.Content className="layer-stack">
+            </Panel.Header>
+            <Panel.Content className="layer-stack">
                 {layers.map((layer, index) => {
                     const details = detailLines(layer.details);
                     return (
                         <div
                             className={`layer-block layer-block-${layer.status}`}
                             key={layer.key}
-                            style={{"--layer-delay": `${index * 55}ms`}}
+                            style={{"--motion-index": index}}
                         >
                             <span className="layer-connector" aria-hidden="true" />
                             <div className="layer-row">
                                 <div className="layer-index">
-                                    {layerNumbers[layer.key] || String(index + 1).padStart(2, "0")}
+                                    {toolNumber(layer.key, index)}
                                 </div>
                                 <div className="layer-copy">
                                     <div>
@@ -90,7 +52,7 @@ export default function LayerList({report}) {
                                 <StatusBadge status={layer.status} />
                             </div>
                             {details.length > 0 && (
-                                <details className="layer-details" open={index === firstIssueIndex}>
+                                <details className="layer-details" defaultOpen={index === firstIssueIndex}>
                                     <summary>
                                         <span>{details.length} returned fields</span>
                                         <ChevronIcon size={15} />
@@ -110,7 +72,7 @@ export default function LayerList({report}) {
                         </div>
                     );
                 })}
-            </Card.Content>
-        </Card>
+            </Panel.Content>
+        </Panel>
     );
 }

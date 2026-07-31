@@ -1,8 +1,8 @@
-import {Button, Card, Input, Spinner} from "@heroui/react";
 import {useEffect, useState} from "react";
 
-import {saveAppSettings} from "../api";
 import {GlobeIcon, SettingsIcon} from "../components/Icons";
+import Panel from "../components/ui/Panel";
+import Spinner from "../components/ui/Spinner";
 
 const roles = [
     {
@@ -20,7 +20,12 @@ const roles = [
 function ConfigurationStatus({ready, label, description}) {
     return (
         <div className="config-row">
-            <span className={ready ? "config-icon config-ready" : "config-icon"}><i /></span>
+            <span
+                aria-hidden="true"
+                className={ready ? "config-icon config-ready" : "config-icon"}
+            >
+                <i />
+            </span>
             <div><strong>{label}</strong><p>{description}</p></div>
             <span className={ready ? "config-state ready" : "config-state"}>
                 {ready ? "Configured" : "Not configured"}
@@ -29,39 +34,74 @@ function ConfigurationStatus({ready, label, description}) {
     );
 }
 
-export default function SettingsPage({appSettings, onSaved}) {
+export default function SettingsPage({
+    appSettings,
+    diagnosisRunning,
+    draft,
+    error: loadError,
+    onChange,
+    onDraftChange,
+    onReconcile,
+    onRetry,
+    onSave,
+    saveBlocking,
+    saveError,
+    saveStatus,
+    status,
+}) {
     const settings = appSettings?.settings;
-    const [role, setRole] = useState("remote_server");
-    const [remoteUrl, setRemoteUrl] = useState("");
-    const [password, setPassword] = useState("");
-    const [apiToken, setApiToken] = useState("");
-    const [openaiKey, setOpenaiKey] = useState("");
-    const [openaiBaseUrl, setOpenaiBaseUrl] = useState("");
-    const [openaiApiMode, setOpenaiApiMode] = useState("auto");
-    const [openaiModel, setOpenaiModel] = useState("gpt-5.6");
-    const [newSettingsPassword, setNewSettingsPassword] = useState("");
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState("");
-    const [error, setError] = useState("");
+    const initialDraft = draft || {
+        instance_role: settings?.instance_role || "remote_server",
+        new_settings_password: "",
+        openai_api_key: "",
+        openai_api_mode: appSettings?.openai_api_mode || "auto",
+        openai_base_url: appSettings?.openai_base_url || "",
+        openai_model: appSettings?.openai_model || "gpt-5.6",
+        remote_service_url: settings?.remote_service_url || "",
+        servicepath_api_token: "",
+        settings_password: "",
+    };
+    const [role, setRole] = useState(initialDraft.instance_role);
+    const [remoteUrl, setRemoteUrl] = useState(initialDraft.remote_service_url);
+    const [password, setPassword] = useState(initialDraft.settings_password);
+    const [apiToken, setApiToken] = useState(initialDraft.servicepath_api_token);
+    const [openaiKey, setOpenaiKey] = useState(initialDraft.openai_api_key);
+    const [openaiBaseUrl, setOpenaiBaseUrl] = useState(initialDraft.openai_base_url);
+    const [openaiApiMode, setOpenaiApiMode] = useState(initialDraft.openai_api_mode);
+    const [openaiModel, setOpenaiModel] = useState(initialDraft.openai_model);
+    const [newSettingsPassword, setNewSettingsPassword] = useState(initialDraft.new_settings_password);
+    const saving = saveStatus === "saving";
+    const locked = saving || diagnosisRunning || saveBlocking;
+    const saveState = saving ? "running" : (saveStatus === "error" ? "error" : "idle");
 
     useEffect(() => {
-        if (settings) {
+        if (settings && !draft) {
             setRole(settings.instance_role);
             setRemoteUrl(settings.remote_service_url);
+            setPassword("");
+            setApiToken("");
+            setOpenaiKey("");
             setOpenaiBaseUrl(appSettings.openai_base_url || "");
             setOpenaiApiMode(appSettings.openai_api_mode || "auto");
             setOpenaiModel(appSettings.openai_model);
+            setNewSettingsPassword("");
         }
-    }, [appSettings, settings]);
+    }, [appSettings, draft, settings]);
+
+    function updateDraft(setter, field, value) {
+        setter(value);
+        onDraftChange(field, value);
+    }
 
     async function submit(event) {
         event.preventDefault();
-        setSaving(true);
-        setMessage("");
-        setError("");
+        if (locked) {
+            return;
+        }
 
         try {
-            const result = await saveAppSettings({
+            // App owns the request so navigation does not discard saved settings.
+            await onSave({
                 instance_role: role,
                 remote_service_url: remoteUrl,
                 settings_password: password,
@@ -72,21 +112,30 @@ export default function SettingsPage({appSettings, onSaved}) {
                 openai_model: openaiModel,
                 new_settings_password: newSettingsPassword,
             });
-            onSaved(result);
-            setPassword("");
-            setApiToken("");
-            setOpenaiKey("");
-            setNewSettingsPassword("");
-            setMessage("Settings saved successfully.");
-        } catch (requestError) {
-            setError(requestError.message);
-        } finally {
-            setSaving(false);
+        } catch {
+            // App keeps the error visible across navigation.
         }
     }
 
-    if (!appSettings) {
-        return <div className="page-loading"><Spinner size="lg" /><p>Loading settings...</p></div>;
+    if (status === "loading") {
+        return (
+            <div aria-atomic="true" className="page-loading" role="status">
+                <Spinner size="lg" />
+                <p>Loading settings...</p>
+            </div>
+        );
+    }
+
+    if (status === "error" || !appSettings) {
+        return (
+            <Panel className="state-card">
+                <Panel.Content>
+                    <h1>Settings unavailable</h1>
+                    <p role="alert">{loadError || "Application settings could not be loaded."}</p>
+                    <button className="secondary-button" onClick={onRetry} type="button">Try again</button>
+                </Panel.Content>
+            </Panel>
+        );
     }
 
     return (
@@ -99,29 +148,47 @@ export default function SettingsPage({appSettings, onSaved}) {
                 </div>
             </section>
 
-            <form className="settings-grid" onSubmit={submit}>
-                <Card className="settings-panel" variant="secondary">
-                    <Card.Header>
+            <form
+                className="settings-grid"
+                data-state={saveState}
+                onChange={onChange}
+                onSubmit={submit}
+            >
+                <Panel className="settings-panel">
+                    <Panel.Header>
                         <div>
                             <span className="section-kicker">EXECUTION</span>
-                            <Card.Title>Instance role</Card.Title>
-                            <Card.Description>Define how this copy of ServicePath should behave.</Card.Description>
+                            <Panel.Title>Instance role</Panel.Title>
+                            <Panel.Description>Define how this copy of ServicePath should behave.</Panel.Description>
                         </div>
-                    </Card.Header>
-                    <Card.Content>
-                        <div className="role-options">
-                            {roles.map((item) => (
-                                <button
-                                    className={`role-option ${role === item.value ? "role-selected" : ""}`}
-                                    key={item.value}
-                                    onClick={() => setRole(item.value)}
-                                    type="button"
-                                >
-                                    <span className="role-radio"><i /></span>
-                                    <span><strong>{item.title}</strong><small>{item.description}</small></span>
-                                </button>
-                            ))}
-                        </div>
+                    </Panel.Header>
+                    <Panel.Content>
+                        <fieldset>
+                            <legend className="sr-only">Instance role</legend>
+                            <div className="role-options">
+                                {roles.map((item) => (
+                                    <label
+                                        className={`role-option ${role === item.value ? "role-selected" : ""}`}
+                                        key={item.value}
+                                    >
+                                        <input
+                                            checked={role === item.value}
+                                            disabled={locked}
+                                            name="instance-role"
+                                            onChange={() => updateDraft(
+                                                setRole,
+                                                "instance_role",
+                                                item.value,
+                                            )}
+                                            type="radio"
+                                            value={item.value}
+                                        />
+                                        <span aria-hidden="true" className="role-radio"><i /></span>
+                                        <span><strong>{item.title}</strong><small>{item.description}</small></span>
+                                    </label>
+                                ))}
+                            </div>
+                        </fieldset>
 
                         <div className="settings-subheading">
                             <span className="settings-subheading-icon">01</span>
@@ -130,20 +197,33 @@ export default function SettingsPage({appSettings, onSaved}) {
 
                         <label className="settings-field">
                             <span>Deployed ServicePath URL</span>
-                            <div><GlobeIcon size={17} /><Input onChange={(event) => setRemoteUrl(event.target.value)} placeholder="https://servicepath.example" value={remoteUrl} variant="secondary" /></div>
+                            <div>
+                                <GlobeIcon size={17} />
+                                <input
+                                    disabled={locked}
+                                    onChange={(event) => updateDraft(
+                                        setRemoteUrl,
+                                        "remote_service_url",
+                                        event.target.value,
+                                    )}
+                                    placeholder="https://servicepath.example"
+                                    type="url"
+                                    value={remoteUrl}
+                                />
+                            </div>
                             <small>Required by a Local Device for Remote Test and Compare Both.</small>
                         </label>
-                    </Card.Content>
-                </Card>
+                    </Panel.Content>
+                </Panel>
 
-                <Card className="configuration-panel" variant="secondary">
-                    <Card.Header>
+                <Panel className="configuration-panel">
+                    <Panel.Header>
                         <div>
                             <span className="section-kicker">CONFIGURATION</span>
-                            <Card.Title>Service status</Card.Title>
+                            <Panel.Title>Service status</Panel.Title>
                         </div>
-                    </Card.Header>
-                    <Card.Content>
+                    </Panel.Header>
+                    <Panel.Content>
                         <ConfigurationStatus
                             description="Protects the remote diagnostic endpoint."
                             label="Remote API token"
@@ -152,26 +232,31 @@ export default function SettingsPage({appSettings, onSaved}) {
                         <ConfigurationStatus
                             description="Required for autonomous tool selection and diagnosis."
                             label="Diagnostic agent"
-                            ready={appSettings.agent_configured ?? appSettings.ai_configured}
+                            ready={appSettings.agent_configured}
                         />
                         <ConfigurationStatus
                             description="Protects setting changes on a public server."
                             label="Settings password"
                             ready={appSettings.password_required}
                         />
-                        <div className="secret-fields settings-secret-group">
+                        <div className="settings-secret-group">
                             <div className="settings-subheading">
                                 <span className="settings-subheading-icon">02</span>
                                 <div><strong>Remote service</strong><small>Authenticate calls between ServicePath instances.</small></div>
                             </div>
                             <label className="settings-field">
                                 <span>Remote API token</span>
-                                <Input
-                                    onChange={(event) => setApiToken(event.target.value)}
+                                <input
+                                    autoComplete="off"
+                                    disabled={locked}
+                                    onChange={(event) => updateDraft(
+                                        setApiToken,
+                                        "servicepath_api_token",
+                                        event.target.value,
+                                    )}
                                     placeholder="Leave blank to keep the current token"
                                     type="password"
                                     value={apiToken}
-                                    variant="secondary"
                                 />
                             </label>
                         </div>
@@ -182,24 +267,33 @@ export default function SettingsPage({appSettings, onSaved}) {
                             </div>
                             <label className="settings-field">
                                 <span>Agent API key</span>
-                                <Input
-                                    onChange={(event) => setOpenaiKey(event.target.value)}
+                                <input
+                                    autoComplete="off"
+                                    disabled={locked}
+                                    onChange={(event) => updateDraft(
+                                        setOpenaiKey,
+                                        "openai_api_key",
+                                        event.target.value,
+                                    )}
                                     placeholder="Leave blank to keep the current key"
                                     type="password"
                                     value={openaiKey}
-                                    variant="secondary"
                                 />
                             </label>
                             <label className="settings-field">
                                 <span>OpenAI-compatible API base URL</span>
                                 <div>
                                     <GlobeIcon size={17} />
-                                    <Input
-                                        onChange={(event) => setOpenaiBaseUrl(event.target.value)}
+                                    <input
+                                        disabled={locked}
+                                        onChange={(event) => updateDraft(
+                                            setOpenaiBaseUrl,
+                                            "openai_base_url",
+                                            event.target.value,
+                                        )}
                                         placeholder="https://api.openai.com/v1"
                                         type="url"
                                         value={openaiBaseUrl}
-                                        variant="secondary"
                                     />
                                 </div>
                                 <small>Optional. Leave blank for the OpenAI default endpoint.</small>
@@ -208,7 +302,12 @@ export default function SettingsPage({appSettings, onSaved}) {
                                 <span>Agent API protocol</span>
                                 <select
                                     className="settings-select"
-                                    onChange={(event) => setOpenaiApiMode(event.target.value)}
+                                    disabled={locked}
+                                    onChange={(event) => updateDraft(
+                                        setOpenaiApiMode,
+                                        "openai_api_mode",
+                                        event.target.value,
+                                    )}
                                     value={openaiApiMode}
                                 >
                                     <option value="auto">Auto (recommended)</option>
@@ -219,11 +318,16 @@ export default function SettingsPage({appSettings, onSaved}) {
                             </label>
                             <label className="settings-field">
                                 <span>Model name</span>
-                                <Input
-                                    onChange={(event) => setOpenaiModel(event.target.value)}
+                                <input
+                                    disabled={locked}
+                                    onChange={(event) => updateDraft(
+                                        setOpenaiModel,
+                                        "openai_model",
+                                        event.target.value,
+                                    )}
                                     placeholder="gpt-5.6"
+                                    type="text"
                                     value={openaiModel}
-                                    variant="secondary"
                                 />
                             </label>
                         </div>
@@ -234,23 +338,33 @@ export default function SettingsPage({appSettings, onSaved}) {
                             </div>
                             <label className="settings-field">
                                 <span>Current settings password</span>
-                                <Input
-                                    onChange={(event) => setPassword(event.target.value)}
+                                <input
+                                    autoComplete="current-password"
+                                    disabled={locked}
+                                    onChange={(event) => updateDraft(
+                                        setPassword,
+                                        "settings_password",
+                                        event.target.value,
+                                    )}
                                     placeholder={appSettings.password_required ? "Required to save changes" : "Not required from localhost"}
                                     type="password"
                                     value={password}
-                                    variant="secondary"
                                 />
                                 <small>Authenticates this update when a password already exists.</small>
                             </label>
                             <label className="settings-field">
                                 <span>New settings password</span>
-                                <Input
-                                    onChange={(event) => setNewSettingsPassword(event.target.value)}
+                                <input
+                                    autoComplete="new-password"
+                                    disabled={locked}
+                                    onChange={(event) => updateDraft(
+                                        setNewSettingsPassword,
+                                        "new_settings_password",
+                                        event.target.value,
+                                    )}
                                     placeholder="Leave blank to keep the current password"
                                     type="password"
                                     value={newSettingsPassword}
-                                    variant="secondary"
                                 />
                             </label>
                         </div>
@@ -259,19 +373,47 @@ export default function SettingsPage({appSettings, onSaved}) {
                             Existing secret values are never returned to this page or saved in SQLite.
                             The non-secret API base URL is shown so it can be edited or cleared.
                         </p>
-                    </Card.Content>
-                </Card>
+                    </Panel.Content>
+                </Panel>
 
                 <div className="settings-save-bar">
-                    <div aria-live="polite">
-                        {message && <p className="success-message" role="status">{message}</p>}
-                        {error && <p className="form-error" role="alert">{error}</p>}
-                        {!message && !error && <p>Changes apply to the next diagnosis.</p>}
+                    <div>
+                        <p
+                            aria-atomic="true"
+                            className={saveStatus === "success" ? "success-message" : "sr-only"}
+                            role="status"
+                        >
+                            {saveStatus === "success" ? "Settings saved successfully." : ""}
+                        </p>
+                        <p
+                            aria-atomic="true"
+                            className={saveStatus === "error" ? "form-error" : "sr-only"}
+                            role="alert"
+                        >
+                            {saveStatus === "error" ? saveError : ""}
+                        </p>
+                        {saveStatus === "error" && saveBlocking && (
+                            <button
+                                className="inline-action"
+                                onClick={onReconcile}
+                                type="button"
+                            >
+                                Reload saved configuration
+                            </button>
+                        )}
+                        {diagnosisRunning ? (
+                            <p>Wait for the current investigation before changing settings.</p>
+                        ) : saveStatus !== "success" && saveStatus !== "error" && (
+                            <p>
+                                Changes apply to the next diagnosis in single-process development.
+                                Restart every worker in multi-worker production.
+                            </p>
+                        )}
                     </div>
-                    <Button className="save-button" isDisabled={saving} isPending={saving} type="submit" variant="primary">
-                        {saving && <Spinner color="current" size="sm" />}
+                    <button aria-busy={saving} className="save-button" disabled={locked} type="submit">
+                        {saving && <Spinner size="sm" />}
                         {saving ? "Saving settings" : "Save all settings"}
-                    </Button>
+                    </button>
                 </div>
             </form>
         </>

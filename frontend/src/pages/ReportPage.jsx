@@ -1,19 +1,16 @@
-import {Button, Card, Spinner} from "@heroui/react";
-import {useEffect, useState} from "react";
+import {useCallback, useEffect, useState} from "react";
 
 import {getReport} from "../api";
 import AnalysisPanel from "../components/AnalysisPanel";
+import AppLink from "../components/AppLink";
 import DiagnosticConsole from "../components/DiagnosticConsole";
 import {ArrowIcon} from "../components/Icons";
 import LayerList from "../components/LayerList";
 import StatusBadge from "../components/StatusBadge";
-
-function formatDate(value) {
-    return new Intl.DateTimeFormat(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-    }).format(new Date(value));
-}
+import Panel from "../components/ui/Panel";
+import Spinner from "../components/ui/Spinner";
+import {formatDate} from "../domain/diagnostics";
+import useAbortableTask from "../hooks/useAbortableTask";
 
 function ReportMetric({label, value}) {
     return (
@@ -26,14 +23,14 @@ function ReportMetric({label, value}) {
 
 function CompareTable({report}) {
     return (
-        <Card className="comparison-panel" variant="secondary">
-            <Card.Header>
+        <Panel className="comparison-panel">
+            <Panel.Header>
                 <div>
                     <span className="section-kicker">SIDE BY SIDE</span>
-                    <Card.Title>Evidence comparison</Card.Title>
+                    <Panel.Title>Evidence comparison</Panel.Title>
                 </div>
-            </Card.Header>
-            <Card.Content>
+            </Panel.Header>
+            <Panel.Content>
                 <div className="comparison-table">
                     <div className="comparison-head"><span>Check</span><span>Local</span><span>Remote</span></div>
                     {report.comparison.layers.map((row) => (
@@ -44,27 +41,56 @@ function CompareTable({report}) {
                         </div>
                     ))}
                 </div>
-            </Card.Content>
-        </Card>
+            </Panel.Content>
+        </Panel>
     );
 }
 
 export default function ReportPage({reportId, navigate}) {
     const [report, setReport] = useState(null);
     const [error, setError] = useState("");
+    const {run: runReportRequest} = useAbortableTask();
 
-    useEffect(() => {
+    const loadReport = useCallback(async () => {
         setReport(null);
         setError("");
-        getReport(reportId).then(setReport).catch((requestError) => setError(requestError.message));
-    }, [reportId]);
+
+        try {
+            const result = await runReportRequest((signal) => getReport(reportId, {signal}));
+            if (result.completed) {
+                setReport(result.value);
+            }
+        } catch (requestError) {
+            setError(requestError.message);
+        }
+    }, [reportId, runReportRequest]);
+
+    useEffect(() => {
+        loadReport();
+    }, [loadReport]);
 
     if (error) {
-        return <Card className="state-card"><Card.Content><h1>Report unavailable</h1><p>{error}</p><Button onPress={() => navigate("/")}>New diagnosis</Button></Card.Content></Card>;
+        return (
+            <Panel className="state-card">
+                <Panel.Content>
+                    <h1>Report unavailable</h1>
+                    <p role="alert">{error}</p>
+                    <button className="secondary-button" onClick={loadReport} type="button">
+                        Try again
+                    </button>
+                    <AppLink className="secondary-button" href="/" navigate={navigate}>New diagnosis</AppLink>
+                </Panel.Content>
+            </Panel>
+        );
     }
 
     if (!report) {
-        return <div className="page-loading"><Spinner size="lg" /><p>Loading report...</p></div>;
+        return (
+            <div aria-atomic="true" className="page-loading" role="status">
+                <Spinner size="lg" />
+                <p>Loading report...</p>
+            </div>
+        );
     }
 
     const compare = report.mode === "compare";
@@ -80,9 +106,9 @@ export default function ReportPage({reportId, navigate}) {
                     </div>
                     <div className="report-actions">
                         <StatusBadge status={report.status} />
-                        <Button onPress={() => navigate("/")} size="sm" variant="secondary">
+                        <AppLink className="secondary-button" href="/" navigate={navigate}>
                             New test <ArrowIcon size={15} />
-                        </Button>
+                        </AppLink>
                     </div>
                 </div>
                 <div className="report-metrics" aria-label="Report summary">

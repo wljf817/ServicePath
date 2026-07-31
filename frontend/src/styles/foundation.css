@@ -1,13 +1,4 @@
 :root {
-    --background: #070b12;
-    --foreground: #f2f6fc;
-    --surface: #0c1320;
-    --surface-secondary: #111b2b;
-    --accent: #6ea8fe;
-    --accent-foreground: #07101d;
-    --muted: #7f8da3;
-    --border: #253044;
-    --radius: 1rem;
     --sp-bg: #070b12;
     --sp-bg-soft: #0a101b;
     --sp-panel: rgba(12, 19, 32, 0.9);
@@ -29,19 +20,20 @@
     --sp-radius-md: 18px;
     --sp-radius-lg: 24px;
     --sp-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
-    --sp-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
     color-scheme: dark;
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-* {
+/* Normalize native controls before applying the application styles. */
+*,
+*::before,
+*::after {
     box-sizing: border-box;
 }
 
 html {
     background: var(--sp-bg);
-    scroll-behavior: smooth;
 }
 
 body {
@@ -54,15 +46,64 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+body,
+h1,
+h2,
+h3,
+p,
+ol,
+ul,
+fieldset {
+    margin: 0;
+}
+
+ol,
+ul,
+fieldset {
+    padding: 0;
+}
+
 button,
-input {
+input,
+select,
+textarea {
     font: inherit;
 }
 
 button,
 a,
-input {
+input,
+select {
     -webkit-tap-highlight-color: transparent;
+}
+
+button {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    appearance: none;
+    background: transparent;
+    color: inherit;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.56;
+}
+
+input::placeholder {
+    color: #586a82;
+    opacity: 1;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+fieldset {
+    min-width: 0;
+    border: 0;
 }
 
 :focus-visible {
@@ -86,6 +127,7 @@ input {
     overflow: clip;
 }
 
+/* Shared application shell. */
 .ambient-backdrop {
     position: fixed;
     z-index: -2;
@@ -108,7 +150,6 @@ input {
     border-radius: 50%;
     filter: blur(90px);
     opacity: 0.16;
-    animation: ambient-drift 18s var(--sp-ease) infinite alternate;
 }
 
 .ambient-orb-one {
@@ -121,7 +162,6 @@ input {
     top: 7rem;
     right: -30rem;
     background: #5b42bd;
-    animation-delay: -8s;
 }
 
 .ambient-grid {
@@ -132,12 +172,6 @@ input {
         linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px);
     background-size: 54px 54px;
     mask-image: linear-gradient(to bottom, black, transparent 72%);
-}
-
-@keyframes ambient-drift {
-    to {
-        transform: translate3d(6rem, 3rem, 0) scale(1.08);
-    }
 }
 
 .topbar {
@@ -193,7 +227,6 @@ input {
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
         0 10px 30px rgba(34, 83, 170, 0.15);
-    transition: transform 240ms var(--sp-ease), border-color 240ms ease;
 }
 
 .brand-mark svg {
@@ -223,7 +256,7 @@ input {
     display: flex;
     gap: 4px;
     padding: 4px;
-    border-color: rgba(148, 163, 184, 0.12);
+    border: 1px solid rgba(148, 163, 184, 0.12);
     border-radius: 13px;
     background: rgba(12, 19, 32, 0.72);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
@@ -241,24 +274,23 @@ input {
     border: 0;
     border-radius: 999px;
     appearance: none;
-    background: transparent !important;
-    color: #8290a4 !important;
+    background: transparent;
+    color: #8290a4;
     cursor: pointer;
     font-family: inherit;
     font-size: 12px;
     font-weight: 650;
-    transition: color 180ms ease, background 180ms ease, transform 180ms ease !important;
 }
 
 .nav-button:hover {
-    background: rgba(110, 168, 254, 0.07) !important;
-    color: var(--sp-text-soft) !important;
+    background: rgba(110, 168, 254, 0.07);
+    color: var(--sp-text-soft);
     transform: translateY(-1px);
 }
 
 .nav-button:active {
-    background: rgba(110, 168, 254, 0.1) !important;
-    color: var(--sp-blue-bright) !important;
+    background: rgba(110, 168, 254, 0.1);
+    color: var(--sp-blue-bright);
 }
 
 .nav-button:focus-visible {
@@ -267,20 +299,20 @@ input {
 }
 
 .nav-button-active {
-    background: rgba(110, 168, 254, 0.12) !important;
-    color: var(--sp-blue-bright) !important;
+    background: rgba(110, 168, 254, 0.12);
+    color: var(--sp-blue-bright);
     box-shadow: inset 0 0 0 1px rgba(110, 168, 254, 0.08);
 }
 
 .nav-button-active:hover,
 .nav-button-active:active {
-    background: rgba(110, 168, 254, 0.16) !important;
-    color: var(--sp-blue-bright) !important;
+    background: rgba(110, 168, 254, 0.16);
+    color: var(--sp-blue-bright);
 }
 
 .nav-button-active > span,
 .nav-button-active > svg {
-    color: var(--sp-blue-bright) !important;
+    color: var(--sp-blue-bright);
 }
 
 .nav-button-active::after {
@@ -293,14 +325,6 @@ input {
     background: var(--sp-blue);
     box-shadow: 0 0 8px rgba(110, 168, 254, 0.7);
     content: "";
-    animation: nav-line-in 260ms var(--sp-ease) both;
-}
-
-@keyframes nav-line-in {
-    from {
-        opacity: 0;
-        transform: scaleX(0.3);
-    }
 }
 
 .system-online {
@@ -323,6 +347,28 @@ input {
     box-shadow: 0 0 9px rgba(74, 222, 164, 0.75);
 }
 
+.system-online a {
+    color: inherit;
+}
+
+.system-online-running {
+    color: var(--sp-blue-bright);
+}
+
+.system-online-running i {
+    background: var(--sp-blue);
+    box-shadow: 0 0 9px rgba(110, 168, 254, 0.75);
+}
+
+.system-online-error {
+    color: #fb91a1;
+}
+
+.system-online-error i {
+    background: var(--sp-red);
+    box-shadow: 0 0 9px rgba(251, 113, 133, 0.7);
+}
+
 .app-content {
     position: relative;
     width: min(1280px, calc(100% - 48px));
@@ -335,17 +381,6 @@ input {
     padding-top: 40px;
 }
 
-.page-transition {
-    animation: page-enter 480ms var(--sp-ease) both;
-}
-
-@keyframes page-enter {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-}
-
 .app-footer {
     position: relative;
     display: flex;
@@ -355,7 +390,6 @@ input {
     width: min(1280px, calc(100% - 48px));
     padding: 17px 0 22px;
     border-top: 1px solid rgba(148, 163, 184, 0.1);
-    border-color: rgba(148, 163, 184, 0.1);
     color: #647185;
     font-size: 11px;
 }
@@ -413,6 +447,7 @@ input {
     letter-spacing: 0.13em;
 }
 
+/* Shared panels and controls. */
 .diagnostic-card,
 .console-panel,
 .layers-panel,
@@ -422,17 +457,104 @@ input {
 .history-panel,
 .settings-panel,
 .configuration-panel {
-    border: 1px solid var(--sp-border) !important;
-    border-radius: var(--sp-radius-md) !important;
-    background: var(--sp-panel) !important;
+    border: 1px solid var(--sp-border);
+    border-radius: var(--sp-radius-md);
+    background: var(--sp-panel);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.025),
         var(--sp-shadow);
     backdrop-filter: blur(18px);
 }
 
+.diagnostic-card h2,
+.console-panel h2,
+.layers-panel h2,
+.analysis-panel h2,
+.comparison-panel h2,
+.history-panel h2,
+.settings-panel h2,
+.configuration-panel h2 {
+    color: #dce5f2;
+    font-size: 16px;
+    font-weight: 650;
+}
+
+.panel-description {
+    margin-top: 5px;
+    color: #75859a;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.spinner {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+}
+
+.spinner-sm {
+    width: 14px;
+    height: 14px;
+}
+
+.spinner-lg {
+    width: 28px;
+    height: 28px;
+    border-width: 3px;
+}
+
+.secondary-button,
+.inline-action {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 10px;
+    background: rgba(148, 163, 184, 0.07);
+    color: #bdc9d9;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.secondary-button {
+    padding: 0 13px;
+}
+
+.inline-action {
+    min-height: 30px;
+    margin-left: 10px;
+    padding: 0 9px;
+    border-color: rgba(251, 113, 133, 0.28);
+    background: rgba(251, 113, 133, 0.08);
+    color: #ffc0ca;
+}
+
+.secondary-button:hover,
+.inline-action:hover {
+    border-color: rgba(110, 168, 254, 0.4);
+    color: var(--sp-text);
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 .page-loading {
     display: grid;
+    gap: 12px;
     min-height: 60vh;
     place-content: center;
     justify-items: center;
@@ -465,6 +587,21 @@ input {
 
     .system-online {
         display: none;
+    }
+
+    .system-online-active {
+        display: flex;
+        position: fixed;
+        z-index: 55;
+        top: 72px;
+        right: 16px;
+        min-height: 30px;
+        padding: 0 11px;
+        border: 1px solid var(--sp-border-strong);
+        border-radius: 999px;
+        background: rgba(9, 15, 25, 0.94);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(18px);
     }
 
     .nav-button {
@@ -512,9 +649,9 @@ input {
 
     .nav-button {
         min-height: 49px;
-        flex-direction: column !important;
-        gap: 2px !important;
-        padding-inline: 8px !important;
+        flex-direction: column;
+        gap: 2px;
+        padding-inline: 8px;
         font-size: 9px;
         line-height: 1;
     }
@@ -544,20 +681,5 @@ input {
     .footer-meta span:first-child,
     .footer-meta i {
         display: none;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    html {
-        scroll-behavior: auto;
-    }
-
-    *,
-    *::before,
-    *::after {
-        scroll-behavior: auto !important;
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
     }
 }

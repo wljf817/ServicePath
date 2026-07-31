@@ -1,63 +1,94 @@
-import {Card} from "@heroui/react";
-import {useState} from "react";
+import {useEffect, useRef, useState} from "react";
 
+import {
+    detailLines,
+    reportLayers,
+    runtimeState,
+    statusLabel,
+} from "../domain/diagnostics";
 import {CopyIcon, TerminalIcon} from "./Icons";
+import Panel from "./ui/Panel";
 
-const statusLabels = {
-    passed: "PASS",
-    warning: "WARN",
-    error: "ERROR",
-    skipped: "SKIP",
-};
-
-function detailLines(value, prefix = "") {
-    const lines = [];
-
-    Object.entries(value || {}).forEach(([key, item]) => {
-        const label = prefix ? `${prefix} > ${key}` : key;
-        if (item && typeof item === "object" && !Array.isArray(item)) {
-            lines.push(...detailLines(item, label));
-        } else {
-            const display = Array.isArray(item) ? item.join(", ") || "None" : String(item);
-            lines.push({label, display});
-        }
-    });
-
-    return lines;
-}
-
-export default function DiagnosticConsole({report, label = "Agent Tool Evidence", loading = false}) {
+export default function DiagnosticConsole({
+    report,
+    label = "Agent Tool Evidence",
+    loading = false,
+    state,
+}) {
     const [showRaw, setShowRaw] = useState(true);
     const [copyState, setCopyState] = useState("Copy JSON");
-    const checks = report
-        ? (report.layers || []).flatMap((layer) => (
-            layer.key === "dns" && report.traceroute
-                ? [layer, report.traceroute]
-                : [layer]
-        ))
-        : [];
+    const [copyAnnouncement, setCopyAnnouncement] = useState("");
+    const copyOperationRef = useRef(0);
+    const copyResetTimerRef = useRef(null);
+    const currentState = runtimeState(state, loading);
+    const running = currentState === "running";
+    const liveDotClass = currentState === "running"
+        ? "live-dot live-dot-loading"
+        : (currentState === "error" ? "live-dot live-dot-error" : "live-dot");
+    const checks = reportLayers(report);
+
+    useEffect(() => {
+        copyOperationRef.current += 1;
+        if (copyResetTimerRef.current !== null) {
+            window.clearTimeout(copyResetTimerRef.current);
+            copyResetTimerRef.current = null;
+        }
+        setCopyState("Copy JSON");
+        setCopyAnnouncement("");
+    }, [report]);
+
+    useEffect(() => () => {
+        copyOperationRef.current += 1;
+        if (copyResetTimerRef.current !== null) {
+            window.clearTimeout(copyResetTimerRef.current);
+        }
+    }, []);
 
     async function copyReport() {
         if (!report) {
             return;
         }
 
+        const operation = copyOperationRef.current + 1;
+        copyOperationRef.current = operation;
+        if (copyResetTimerRef.current !== null) {
+            window.clearTimeout(copyResetTimerRef.current);
+            copyResetTimerRef.current = null;
+        }
+        setCopyState("Copying");
+        setCopyAnnouncement("");
+
+        let nextState;
+        let announcement;
         try {
             await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
-            setCopyState("Copied");
+            nextState = "Copied";
+            announcement = "Report JSON copied.";
         } catch {
-            setCopyState("Copy failed");
+            nextState = "Copy failed";
+            announcement = "Report JSON could not be copied.";
         }
 
-        window.setTimeout(() => setCopyState("Copy JSON"), 1800);
+        if (copyOperationRef.current !== operation) {
+            return;
+        }
+
+        setCopyState(nextState);
+        setCopyAnnouncement(announcement);
+        copyResetTimerRef.current = window.setTimeout(() => {
+            if (copyOperationRef.current === operation) {
+                setCopyState("Copy JSON");
+            }
+            copyResetTimerRef.current = null;
+        }, 1800);
     }
 
     return (
-        <Card className="console-panel" variant="secondary">
-            <Card.Header className="panel-header">
+        <Panel aria-busy={running} className="console-panel" data-state={currentState}>
+            <Panel.Header className="panel-header">
                 <div>
                     <span className="section-kicker">AGENT EVIDENCE</span>
-                    <Card.Title className="panel-title"><TerminalIcon size={18} /> {label}</Card.Title>
+                    <Panel.Title className="panel-title"><TerminalIcon size={18} /> {label}</Panel.Title>
                 </div>
                 <div className="console-actions">
                     {report && (
@@ -70,32 +101,50 @@ export default function DiagnosticConsole({report, label = "Agent Tool Evidence"
                             >
                                 Raw {showRaw ? "on" : "off"}
                             </button>
-                            <button className="console-action" onClick={copyReport} type="button">
+                            <button
+                                aria-busy={copyState === "Copying"}
+                                className="console-action"
+                                onClick={copyReport}
+                                type="button"
+                            >
                                 <CopyIcon size={13} /> {copyState}
                             </button>
                         </>
                     )}
-                    <span className={loading ? "live-dot live-dot-loading" : "live-dot"} />
+                    <span
+                        aria-hidden="true"
+                        className={liveDotClass}
+                    />
                 </div>
-            </Card.Header>
-            <Card.Content className="terminal-window">
+            </Panel.Header>
+            <span aria-atomic="true" className="sr-only" role="status">
+                {copyAnnouncement}
+            </span>
+            <Panel.Content className="terminal-window">
                 <div className="terminal-chrome" aria-hidden="true">
                     <span /><span /><span />
                     <small>servicepath://diagnostics</small>
                 </div>
-                {loading && (
-                    <div className="terminal-loading" aria-live="polite">
+                {running && (
+                    <div className="terminal-loading">
                         <p><span className="term-info">[INFO]</span> Starting the diagnostic agent...</p>
                         <p><span className="term-run">[AGENT]</span> Selecting bounded network tools from returned evidence</p>
-                        <p className="terminal-prompt"><span>servicepath</span> investigation in progress <i /></p>
+                        <p className="terminal-prompt"><span>servicepath</span> investigation in progress <i aria-hidden="true" /></p>
                         <div className="terminal-scan-line" aria-hidden="true" />
                     </div>
                 )}
 
-                {!loading && !report && (
+                {currentState === "idle" && !report && (
                     <>
                         <p><span className="term-ready">[READY]</span> Waiting for a website to test...</p>
                         <p className="term-muted">Enter a domain above to begin.</p>
+                    </>
+                )}
+
+                {currentState === "error" && !report && (
+                    <>
+                        <p><span className="term-error">[ERROR]</span> Investigation stopped.</p>
+                        <p className="term-muted">Review the error above and try again.</p>
                     </>
                 )}
 
@@ -113,23 +162,35 @@ export default function DiagnosticConsole({report, label = "Agent Tool Evidence"
                                     </p>
                                 )}
                                 {report.agent.requested_tools?.map((entry, index) => (
-                                    <p className="terminal-indent" key={`request-${entry.tool}-${index}`}>
+                                    <p
+                                        className="terminal-indent"
+                                        key={`request-${entry.tool}-${index}`}
+                                        style={{"--motion-index": index}}
+                                    >
                                         <span className="term-return">[SELECT {String(index + 1).padStart(2, "0")}]</span> {entry.tool} · {entry.status}
                                     </p>
                                 ))}
                                 {report.agent.tool_log?.map((entry, index) => (
-                                    <p className="terminal-indent" key={`${entry.tool}-${index}`}>
+                                    <p
+                                        className="terminal-indent"
+                                        key={`${entry.tool}-${index}`}
+                                        style={{"--motion-index": index}}
+                                    >
                                         <span className="term-run">[CHECK {String(index + 1).padStart(2, "0")}]</span> {entry.tool} · {entry.status} · {entry.duration_ms} ms
                                     </p>
                                 ))}
                             </>
                         )}
                         {checks.map((layer, index) => (
-                            <div className="terminal-group" key={`${layer.key}-${index}`}>
+                            <div
+                                className="terminal-group"
+                                key={`${layer.key}-${index}`}
+                                style={{"--motion-index": index}}
+                            >
                                 <p><span className="term-check">[CHECK]</span> {layer.name}</p>
                                 <p className="terminal-indent">
                                     <span className={`term-${layer.status}`}>
-                                        [{statusLabels[layer.status] || layer.status.toUpperCase()}]
+                                        [{statusLabel(layer.status)}]
                                     </span> {layer.summary}
                                 </p>
                                 <p className="terminal-indent"><span className="term-info">[TIME]</span> {layer.duration_ms} ms</p>
@@ -149,7 +210,7 @@ export default function DiagnosticConsole({report, label = "Agent Tool Evidence"
                         <p className="terminal-done"><span className="term-info">[DONE]</span> Finished in {report.duration_ms} ms · {report.status.toUpperCase()}</p>
                     </>
                 )}
-            </Card.Content>
-        </Card>
+            </Panel.Content>
+        </Panel>
     );
 }

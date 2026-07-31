@@ -1,19 +1,22 @@
-const pathStages = [
-    {name: "Device", description: "Client network"},
-    {name: "DNS", description: "Name resolution"},
-    {name: "Route", description: "Network path"},
-    {name: "TCP", description: "Port connection"},
-    {name: "TLS", description: "Secure handshake"},
-    {name: "HTTP", description: "Application response"},
-];
+import {DIAGNOSTIC_TOOLS, runtimeState} from "../domain/diagnostics";
 
-export default function NetworkPathVisual({loading = false}) {
-    const visualClass = loading
+export default function NetworkPathVisual({loading = false, state}) {
+    const currentState = runtimeState(state, loading);
+    const running = currentState === "running";
+    const visualClass = running
         ? "network-path-visual network-path-visual-running"
         : "network-path-visual";
+    const stateLabel = running
+        ? "Agent investigating"
+        : (currentState === "error" ? "Investigation stopped" : "Tools ready");
 
     return (
-        <section className={visualClass} aria-labelledby="network-path-title">
+        <section
+            aria-busy={running}
+            aria-labelledby="network-path-title"
+            className={visualClass}
+            data-state={currentState}
+        >
             <div className="network-path-heading">
                 <div>
                     <span className="network-path-kicker">AVAILABLE EVIDENCE</span>
@@ -21,7 +24,7 @@ export default function NetworkPathVisual({loading = false}) {
                 </div>
                 <span className="network-path-state">
                     <i aria-hidden="true" />
-                    {loading ? "Agent investigating" : "Tools ready"}
+                    {stateLabel}
                 </span>
             </div>
 
@@ -31,12 +34,16 @@ export default function NetworkPathVisual({loading = false}) {
                 </div>
 
                 <ol className="network-path-list" aria-label="Diagnostic stages">
-                    {pathStages.map((stage, index) => (
-                        <li className="network-path-stage" key={stage.name}>
+                    {DIAGNOSTIC_TOOLS.map((stage, index) => (
+                        <li
+                            className="network-path-stage"
+                            key={stage.key}
+                            style={{"--motion-index": index}}
+                        >
                             <span className="network-path-node" aria-hidden="true">
                                 <span>{String(index + 1).padStart(2, "0")}</span>
                             </span>
-                            <strong>{stage.name}</strong>
+                            <strong>{stage.pathName}</strong>
                             <small>{stage.description}</small>
                         </li>
                     ))}
