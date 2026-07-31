@@ -9,20 +9,16 @@ import Panel from "../components/ui/Panel";
 import Spinner from "../components/ui/Spinner";
 
 const modes = [
-    {value: "local", title: "Local Test", description: "This device and network"},
-    {value: "remote", title: "Remote Test", description: "Deployed ServicePath server"},
-    {value: "compare", title: "Compare Both", description: "Local and remote side by side"},
+    {value: "client", title: "Client Test", description: "This device and network"},
+    {value: "server", title: "Server Test", description: "Connected ServicePath server"},
 ];
 
 export default function DashboardPage({
     appSettings,
     diagnosis,
     onChange,
-    onReconcileSettings,
-    onRetrySettings,
     onStartDiagnosis,
     settingsError,
-    settingsSaveBlocking,
     settingsSaveError,
     settingsSaveStatus,
     settingsStatus,
@@ -31,16 +27,15 @@ export default function DashboardPage({
     const settingsReady = (
         settingsStatus === "ready"
         && settingsSaveStatus !== "saving"
-        && !(settingsSaveStatus === "error" && settingsSaveBlocking)
     );
-    const role = appSettings?.settings.instance_role || "remote_server";
+    const role = appSettings?.settings.instance_role;
     const configuredRoleRef = useRef(null);
     const [domain, setDomain] = useState(diagnosis.target || "");
-    const [mode, setMode] = useState(diagnosis.mode || "remote");
+    const [mode, setMode] = useState(diagnosis.mode || "server");
     const runState = diagnosis.status === "complete" ? "idle" : diagnosis.status;
     const error = diagnosis.error;
     const loading = runState === "running";
-    const requiresLocalAgent = role === "remote_server" || mode !== "remote";
+    const requiresLocalAgent = role === "server" || mode === "client";
     const agentConfigured = appSettings?.agent_configured;
     const agentUnavailable = Boolean(
         settingsReady && requiresLocalAgent && !agentConfigured,
@@ -53,7 +48,7 @@ export default function DashboardPage({
 
         configuredRoleRef.current = role;
         if (["complete", "idle"].includes(diagnosis.status)) {
-            setMode(role === "remote_server" ? "remote" : "local");
+            setMode(role === "server" ? "server" : "client");
         }
     }, [diagnosis.status, role, settingsReady]);
 
@@ -63,7 +58,7 @@ export default function DashboardPage({
             setMode(diagnosis.mode);
         } else if (diagnosis.status === "error" && settingsReady) {
             const nextMode = modeDisabled(diagnosis.mode)
-                ? (role === "remote_server" ? "remote" : "local")
+                ? (role === "server" ? "server" : "client")
                 : diagnosis.mode;
             setDomain(diagnosis.target);
             setMode(nextMode);
@@ -74,7 +69,7 @@ export default function DashboardPage({
     }, [diagnosis.mode, diagnosis.status, diagnosis.target, onChange, role, settingsReady]);
 
     function modeDisabled(value) {
-        return !settingsReady || (role === "remote_server" && value !== "remote");
+        return !settingsReady || (role === "server" && value !== "server");
     }
 
     function submit(event) {
@@ -121,7 +116,7 @@ export default function DashboardPage({
                             </div>
                             <span className="role-chip">
                                 {settingsReady
-                                    ? (role === "remote_server" ? "Remote server" : "Local device")
+                                    ? (role === "server" ? "Server" : "Client")
                                     : "Configuration pending"}
                             </span>
                         </div>
@@ -165,33 +160,14 @@ export default function DashboardPage({
                             </p>
                         )}
                         {settingsSaveStatus === "error" && (
-                            <div className="form-error">
-                                <span role="alert">
-                                    {settingsSaveError || "Application settings were not saved."}
-                                </span>
-                                {settingsSaveBlocking ? (
-                                    <button
-                                        className="inline-action"
-                                        disabled={settingsStatus === "loading"}
-                                        onClick={onReconcileSettings}
-                                        type="button"
-                                    >
-                                        Reload saved configuration
-                                    </button>
-                                ) : (
-                                    <span> The last saved configuration is still active.</span>
-                                )}
-                            </div>
+                            <p className="form-error" role="alert">
+                                {settingsSaveError || "Application settings were not saved."}
+                            </p>
                         )}
                         {settingsStatus === "error" && (
-                            <div className="form-error">
-                                <span role="alert">
-                                    {settingsError || "Application settings could not be loaded."}
-                                </span>
-                                <button className="inline-action" onClick={onRetrySettings} type="button">
-                                    Try again
-                                </button>
-                            </div>
+                            <p className="form-error" role="alert">
+                                {settingsError || "Application settings could not be loaded."}
+                            </p>
                         )}
                         {agentUnavailable && (
                             <p className="form-error" role="alert">
@@ -240,7 +216,7 @@ export default function DashboardPage({
             </Panel>
 
             <section aria-busy={loading} className="dashboard-grid" data-state={runState}>
-                <DiagnosticConsole state={runState} />
+                <DiagnosticConsole events={diagnosis.events} state={runState} />
                 <LayerList />
             </section>
         </>

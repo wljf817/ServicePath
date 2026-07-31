@@ -1,5 +1,4 @@
 from diagnostics.agent import run_agent_diagnostics
-from diagnostics.compare import compare_reports
 from diagnostics.remote import run_remote_diagnostics
 
 
@@ -7,33 +6,33 @@ class ExecutionError(RuntimeError):
     """Raised when a test mode cannot run from this instance role."""
 
 
-def run_selected_diagnostics(target, mode, settings):
-    if not isinstance(mode, str) or mode not in {"local", "remote", "compare"}:
-        raise ExecutionError("Please select Local Test, Remote Test, or Compare Both.")
+def run_selected_diagnostics(target, mode, settings, event_handler=None):
+    if not isinstance(mode, str) or mode not in {"client", "server"}:
+        raise ExecutionError("Please select Client Test or Server Test.")
 
     role = settings["instance_role"]
 
-    if role not in {"remote_server", "local_device"}:
+    if role not in {"server", "client"}:
         raise ExecutionError("ServicePath has an invalid instance role.")
 
-    if role == "remote_server":
-        if mode == "remote":
-            return run_agent_diagnostics(target, mode="remote")
+    if role == "server":
+        if mode == "server":
+            return run_agent_diagnostics(
+                target,
+                mode="server",
+                event_handler=event_handler,
+            )
 
         raise ExecutionError(
-            "Local Test and Compare Both require ServicePath to be running on the "
-            "user's device. A deployed webpage cannot perform raw DNS, TCP, and TLS "
-            "checks from the visitor's computer."
+            "Client Test requires ServicePath to run on the user's device. A "
+            "deployed webpage cannot inspect the visitor's network."
         )
 
-    if mode == "local":
-        return run_agent_diagnostics(target, mode="local")
+    if mode == "client":
+        return run_agent_diagnostics(
+            target,
+            mode="client",
+            event_handler=event_handler,
+        )
 
-    remote_url = settings.get("remote_service_url") or None
-    remote_report = run_remote_diagnostics(target, service_url=remote_url)
-
-    if mode == "remote":
-        return remote_report
-
-    local_report = run_agent_diagnostics(target, mode="local")
-    return compare_reports(local_report, remote_report)
+    return run_remote_diagnostics(target, event_handler=event_handler)

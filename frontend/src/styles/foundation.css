@@ -306,7 +306,6 @@ fieldset { min-width: 0; border: 0; }
 .console-panel,
 .layers-panel,
 .analysis-panel,
-.comparison-panel,
 .state-card,
 .history-panel,
 .settings-panel,
@@ -321,7 +320,6 @@ fieldset { min-width: 0; border: 0; }
 .console-panel h2,
 .layers-panel h2,
 .analysis-panel h2,
-.comparison-panel h2,
 .history-panel h2,
 .settings-panel h2,
 .configuration-panel h2 {

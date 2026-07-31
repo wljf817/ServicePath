@@ -3,14 +3,13 @@ import {useEffect, useState} from "react";
 import {runtimeState} from "../domain/diagnostics";
 
 const modeLabels = {
-    local: "Local device",
-    remote: "Remote server",
-    compare: "Local and remote",
+    client: "Client",
+    server: "Server",
 };
 
-export default function ScanProgress({loading = false, mode, state}) {
+export default function ScanProgress({mode, state}) {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
-    const currentState = runtimeState(state, loading);
+    const currentState = runtimeState(state);
     const running = currentState === "running";
 
     useEffect(() => {
@@ -38,7 +37,10 @@ export default function ScanProgress({loading = false, mode, state}) {
         return null;
     }
 
-    const locationLabel = modeLabels[mode] || "Diagnostic service";
+    const locationLabel = modeLabels[mode];
+    if (!locationLabel) {
+        throw new TypeError(`Invalid diagnostic mode: ${mode}`);
+    }
 
     return (
         <div className="scan-progress" data-state={currentState}>

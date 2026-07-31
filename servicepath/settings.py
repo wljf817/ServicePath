@@ -49,7 +49,6 @@ def _normalize_url_host(hostname, label):
 def _normalize_http_url(value, label):
     """Validate and normalize an optional HTTP endpoint."""
     value = str(value).strip().rstrip("/")
-
     if not value:
         return ""
     if (
@@ -65,6 +64,7 @@ def _normalize_http_url(value, label):
     try:
         parsed = urlsplit(value)
         hostname = parsed.hostname
+        port = parsed.port
     except ValueError as error:
         raise SettingsError(f"{label} is invalid.") from error
 
@@ -74,12 +74,6 @@ def _normalize_http_url(value, label):
         raise SettingsError(f"{label} cannot contain login details.")
     if parsed.query or parsed.fragment:
         raise SettingsError(f"{label} cannot contain a query or fragment.")
-
-    try:
-        port = parsed.port
-    except ValueError as error:
-        raise SettingsError(f"{label} contains an invalid port.") from error
-
     if port is None and parsed.netloc.endswith(":"):
         raise SettingsError(f"{label} contains an invalid port.")
 
@@ -89,44 +83,32 @@ def _normalize_http_url(value, label):
 
 
 def validate_openai_api_mode(value):
-    """Normalize the API surface used by the diagnostic agent."""
-    value = str(value or "auto").strip().lower()
-
-    if value not in {"auto", "responses", "chat_completions"}:
+    value = str(value).strip().lower()
+    if value not in {"responses", "chat_completions"}:
         raise SettingsError(
-            "Agent API protocol must be Auto, Responses, or Chat Completions."
+            "API protocol must be Responses or Chat Completions."
         )
-
     return value
 
 
 def validate_openai_base_url(value):
-    """Normalize an optional OpenAI-compatible API base URL."""
-    return _normalize_http_url(value, "Agent API Base URL")
+    return _normalize_http_url(value, "API Base URL")
 
 
 def validate_servicepath_api_token(value):
-    """Normalize a Bearer token accepted by the remote API."""
+    """Normalize a Bearer token accepted by the server API."""
     value = str(value).strip()
     if value and (len(value) > 4096 or not TOKEN68.fullmatch(value)):
-        raise SettingsError("Remote API token contains unsupported characters.")
+        raise SettingsError("Server API token contains unsupported characters.")
     return value
 
 
-def validate_settings(instance_role, remote_service_url):
+def validate_settings(instance_role):
     instance_role = str(instance_role).strip()
-    if instance_role not in {"remote_server", "local_device"}:
+    if instance_role not in {"server", "client"}:
         raise SettingsError("Please select a valid instance role.")
 
-    remote_service_url = _normalize_http_url(
-        remote_service_url,
-        "Remote Service URL",
-    )
-
-    return {
-        "instance_role": instance_role,
-        "remote_service_url": remote_service_url,
-    }
+    return {"instance_role": instance_role}
 
 
 def _secure_env_file(env_path):
@@ -152,7 +134,7 @@ def update_environment_settings(env_file, data):
     base_url_supplied = "openai_base_url" in data
     base_url = validate_openai_base_url(data.get("openai_base_url", ""))
     api_mode_supplied = "openai_api_mode" in data
-    api_mode = validate_openai_api_mode(data.get("openai_api_mode", "auto"))
+    api_mode = validate_openai_api_mode(data.get("openai_api_mode", "responses"))
     api_token = validate_servicepath_api_token(
         data.get("servicepath_api_token", "")
     )

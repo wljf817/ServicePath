@@ -12,6 +12,7 @@ from servicepath.settings import SettingsError, validate_servicepath_api_token
 
 
 MAX_REMOTE_RESPONSE_BYTES = 1024 * 1024
+NDJSON_MIMETYPE = "application/x-ndjson"
 LAYER_STATUSES = {"passed", "warning", "error", "skipped"}
 LAYER_KEYS = {"client", "dns", "tcp", "tls", "http"}
 FAILURE_STAGES = {"client", "dns", "route", "tcp", "tls", "http", "application"}
@@ -21,15 +22,14 @@ class RemoteError(RuntimeError):
     """Raised when the configured remote diagnostic service cannot be used."""
 
 
-def _remote_endpoint(service_url=None):
-    if service_url is None:
-        service_url = os.getenv("REMOTE_SERVICE_URL", "")
+def _remote_endpoint():
+    service_url = os.getenv("REMOTE_SERVICE_URL", "")
     if not isinstance(service_url, str):
         raise RemoteError("REMOTE_SERVICE_URL is invalid.")
     service_url = service_url.strip()
 
     if not service_url:
-        raise RemoteError("Remote Test requires REMOTE_SERVICE_URL in your .env file.")
+        raise RemoteError("Server Test requires REMOTE_SERVICE_URL in your .env file.")
 
     if (
         len(service_url) > 2048
@@ -72,7 +72,7 @@ def _remote_endpoint(service_url=None):
 
 def _check_deadline(deadline):
     if monotonic() > deadline:
-        raise RemoteError("Remote Test exceeded its time limit.")
+        raise RemoteError("Server Test exceeded its time limit.")
 
 
 def _response_json(response, deadline):
@@ -105,6 +105,40 @@ def _response_json(response, deadline):
         return json.loads(body.decode(response.encoding or "utf-8"))
     except (LookupError, UnicodeError, ValueError, RecursionError) as error:
         raise RemoteError("The remote server returned invalid JSON.") from error
+
+
+def _response_events(response, deadline):
+    body_size = 0
+    buffer = bytearray()
+
+    for chunk in response.iter_content(chunk_size=8192):
+        _check_deadline(deadline)
+        if not chunk:
+            continue
+        body_size += len(chunk)
+        if body_size > MAX_REMOTE_RESPONSE_BYTES:
+            raise RemoteError("The remote server response is too large.")
+        buffer.extend(chunk)
+
+        while b"\n" in buffer:
+            line, _, remainder = buffer.partition(b"\n")
+            buffer = bytearray(remainder)
+            if line:
+                yield _decode_event(line)
+
+    _check_deadline(deadline)
+    if buffer:
+        yield _decode_event(buffer)
+
+
+def _decode_event(line):
+    try:
+        event = json.loads(line.decode("utf-8"))
+    except (UnicodeError, ValueError, RecursionError) as error:
+        raise RemoteError("The remote server returned an invalid event.") from error
+    if not isinstance(event, dict):
+        raise RemoteError("The remote server returned an invalid event.")
+    return event
 
 
 def _is_text(value, max_length, allow_empty=False):
@@ -187,12 +221,23 @@ def _is_layer(layer, allowed_keys):
 def _is_analysis(analysis):
     return (
         isinstance(analysis, dict)
+        and set(analysis) == {
+            "source",
+            "model",
+            "verdict",
+            "headline",
+            "text",
+            "failure_stage",
+            "confidence",
+            "evidence",
+            "causes",
+            "actions",
+        }
         and analysis.get("source") == "agent"
         and _is_text(analysis.get("model"), 200)
-        and _is_choice(analysis.get("completion"), {"complete", "fallback"})
         and _is_choice(
             analysis.get("verdict"),
-            {"reachable", "degraded", "unreachable", "inconclusive"},
+            {"reachable", "degraded", "unreachable"},
         )
         and _is_text(analysis.get("headline"), 160)
         and _is_text(analysis.get("text"), 1200)
@@ -208,24 +253,22 @@ def _is_analysis(analysis):
     )
 
 
-def _is_tool_entry(entry, include_timing=False):
-    if not (
+def _is_tool_entry(entry):
+    return (
         isinstance(entry, dict)
+        and set(entry) == {
+            "tool",
+            "cached",
+            "status",
+            "summary",
+            "duration_ms",
+        }
         and _is_choice(entry.get("tool"), {*LAYER_KEYS, "traceroute"})
         and _is_choice(entry.get("status"), LAYER_STATUSES)
         and _is_text(entry.get("summary"), 1200)
-    ):
-        return False
-    if include_timing:
-        return (
-            isinstance(entry.get("cached"), bool)
-            and _is_number(entry.get("duration_ms"))
-            and (
-                "denied" not in entry
-                or isinstance(entry.get("denied"), bool)
-            )
-        )
-    return True
+        and isinstance(entry.get("cached"), bool)
+        and _is_number(entry.get("duration_ms"))
+    )
 
 
 def _is_agent_trace(agent):
@@ -233,30 +276,53 @@ def _is_agent_trace(agent):
         return False
 
     checks_used = agent.get("checks_used")
-    max_checks = agent.get("max_checks")
-    requested_tools = agent.get("requested_tools")
     tool_log = agent.get("tool_log")
-    token_usage = agent.get("token_usage")
     return (
-        _is_text(agent.get("model"), 200)
+        set(agent) == {
+            "model",
+            "api_mode",
+            "checks_used",
+            "tool_log",
+        }
+        and _is_text(agent.get("model"), 200)
         and _is_choice(agent.get("api_mode"), {"responses", "chat_completions"})
-        and _is_choice(agent.get("completion"), {"complete", "fallback"})
         and _is_count(checks_used)
-        and _is_count(max_checks)
-        and checks_used <= max_checks
-        and isinstance(requested_tools, list)
-        and len(requested_tools) <= 64
-        and all(_is_tool_entry(entry) for entry in requested_tools)
         and isinstance(tool_log, list)
         and len(tool_log) <= 64
-        and all(_is_tool_entry(entry, include_timing=True) for entry in tool_log)
-        and _is_count(agent.get("model_calls"))
-        and isinstance(token_usage, dict)
-        and all(
-            _is_count(token_usage.get(key))
-            for key in ("input", "output", "total")
-        )
+        and all(_is_tool_entry(entry) for entry in tool_log)
     )
+
+
+def _validate_stream_event(event):
+    event_type = event.get("type")
+    if event_type == "run_started":
+        return set(event) == {"type"}
+    if event_type == "tool_started":
+        return (
+            set(event) == {"type", "tool"}
+            and _is_choice(event.get("tool"), {*LAYER_KEYS, "traceroute"})
+        )
+    if event_type == "tool_completed":
+        result = event.get("result")
+        return (
+            set(event) == {"type", "tool", "result"}
+            and _is_choice(event.get("tool"), {*LAYER_KEYS, "traceroute"})
+            and _is_layer(result, {event.get("tool")})
+        )
+    if event_type == "tool_failed":
+        return (
+            set(event) == {"type", "tool", "error"}
+            and _is_choice(event.get("tool"), {*LAYER_KEYS, "traceroute"})
+            and _is_text(event.get("error"), 1200)
+        )
+    if event_type == "error":
+        return (
+            set(event) == {"type", "error"}
+            and _is_text(event.get("error"), 1200)
+        )
+    if event_type == "complete":
+        return set(event) == {"type", "result"}
+    return False
 
 
 def _validate_report(report, expected_target):
@@ -272,7 +338,7 @@ def _validate_report(report, expected_target):
         raise RemoteError("The remote report target does not match the request.")
     if not _is_text(target.get("original"), 2048):
         raise RemoteError("The remote report contains an invalid target.")
-    if report.get("mode") != "remote":
+    if report.get("mode") != "server":
         raise RemoteError("The remote report has an invalid execution mode.")
     if not _is_choice(report.get("status"), {"passed", "warning", "error"}):
         raise RemoteError("The remote report has an invalid overall status.")
@@ -293,15 +359,11 @@ def _validate_report(report, expected_target):
         raise RemoteError("The remote report is missing its agent analysis.")
     if not _is_agent_trace(report.get("agent")):
         raise RemoteError("The remote report is missing its agent trace.")
-    if report.get("comparison") is not None:
-        raise RemoteError("The remote report contains invalid comparison data.")
-
     analysis = report["analysis"]
     expected_status = {
         "reachable": "passed",
         "degraded": "warning",
         "unreachable": "error",
-        "inconclusive": "warning",
     }[analysis["verdict"]]
     failure_stage = analysis["failure_stage"]
     expected_problem = "traceroute" if failure_stage == "route" else failure_stage
@@ -309,7 +371,6 @@ def _validate_report(report, expected_target):
         report["status"] != expected_status
         or report.get("first_problem") != expected_problem
         or report["agent"]["model"] != analysis["model"]
-        or report["agent"]["completion"] != analysis["completion"]
     ):
         raise RemoteError("The remote report contains inconsistent conclusions.")
 
@@ -327,12 +388,12 @@ def _validate_report(report, expected_target):
         raise RemoteError("The remote report contains an invalid traceroute result.")
 
 
-def run_remote_diagnostics(target, timeout=120, service_url=None):
+def run_remote_diagnostics(target, timeout=120, event_handler=None):
     if not _is_number(timeout) or timeout <= 0:
-        raise RemoteError("Remote Test requires a positive timeout.")
+        raise RemoteError("Server Test requires a positive timeout.")
 
     normalized_target = normalize_target(target)
-    endpoint = _remote_endpoint(service_url)
+    endpoint = _remote_endpoint()
     try:
         token = validate_servicepath_api_token(
             os.getenv("SERVICEPATH_API_TOKEN", "")
@@ -357,9 +418,9 @@ def run_remote_diagnostics(target, timeout=120, service_url=None):
             allow_redirects=False,
         )
         if response.is_redirect or 300 <= response.status_code <= 399:
-            raise RemoteError("Remote Test does not follow service redirects.")
-        payload = _response_json(response, deadline)
+            raise RemoteError("Server Test does not follow service redirects.")
         if not response.ok:
+            payload = _response_json(response, deadline)
             remote_message = (
                 payload.get("error", "") if isinstance(payload, dict) else ""
             )
@@ -367,17 +428,40 @@ def run_remote_diagnostics(target, timeout=120, service_url=None):
                 remote_message.strip() if isinstance(remote_message, str) else ""
             )
             if remote_message:
-                raise RemoteError(f"Remote Test failed: {remote_message[:500]}")
+                raise RemoteError(f"Server Test failed: {remote_message[:500]}")
             response.raise_for_status()
-        report = payload
+
+        content_type = response.headers.get("Content-Type", "")
+        if content_type.partition(";")[0].strip().lower() != NDJSON_MIMETYPE:
+            raise RemoteError("The remote server did not return an event stream.")
+
+        started = False
+        for event in _response_events(response, deadline):
+            if not _validate_stream_event(event):
+                raise RemoteError("The remote server returned an invalid event.")
+
+            event_type = event["type"]
+            if event_type == "run_started":
+                if started:
+                    raise RemoteError("The remote server repeated its start event.")
+                started = True
+            elif not started:
+                raise RemoteError("The remote server omitted its start event.")
+
+            if event_type == "error":
+                raise RemoteError(f"Server Test failed: {event['error']}")
+            if event_type == "complete":
+                report = event["result"]
+                _validate_report(report, normalized_target)
+                return report
+            if event_handler and event_type != "run_started":
+                event_handler(event)
+
+        raise RemoteError("The remote server ended before completing the report.")
     except RemoteError:
         raise
     except requests.RequestException as error:
-        raise RemoteError(f"Remote Test failed: {error}") from error
+        raise RemoteError(f"Server Test failed: {error}") from error
     finally:
         if response is not None:
             response.close()
-
-    _validate_report(report, normalized_target)
-    report["mode"] = "remote"
-    return report

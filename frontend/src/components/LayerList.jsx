@@ -36,7 +36,7 @@ export default function LayerList({report}) {
                             <span className="layer-connector" aria-hidden="true" />
                             <div className="layer-row">
                                 <div className="layer-index">
-                                    {toolNumber(layer.key, index)}
+                                    {toolNumber(layer.key)}
                                 </div>
                                 <div className="layer-copy">
                                     <div>

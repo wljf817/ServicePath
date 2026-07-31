@@ -62,12 +62,6 @@ def _command_for(destination, max_hops):
     ]
 
 
-def _text(value):
-    if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
-    return value or ""
-
-
 def skipped_traceroute(reason, destination=None):
     details = {}
     if destination:
@@ -93,10 +87,7 @@ def check_traceroute(addresses, max_hops=8, timeout=12):
     command = _command_for(destination, max_hops)
 
     if not command:
-        return skipped_traceroute(
-            "Traceroute is not installed on this system.",
-            destination,
-        )
+        raise RuntimeError("Traceroute is not installed on this system.")
 
     started = perf_counter()
 
@@ -139,32 +130,8 @@ def check_traceroute(addresses, max_hops=8, timeout=12):
             },
         )
     except subprocess.TimeoutExpired as error:
-        duration = round((perf_counter() - started) * 1000)
-        partial_output = (_text(error.stdout) or _text(error.stderr)).strip()
-        return make_result(
-            "traceroute",
-            "Traceroute",
-            "warning",
-            f"Traceroute stopped after the {timeout}-second limit.",
-            duration,
-            {
-                "Command": shlex.join(command),
-                "Destination address": destination,
-                "Maximum hops": max_hops,
-                "Raw output": partial_output[:MAX_OUTPUT_LENGTH] or "No partial output",
-            },
-        )
+        raise RuntimeError(
+            f"Traceroute exceeded the {timeout}-second limit."
+        ) from error
     except OSError as error:
-        duration = round((perf_counter() - started) * 1000)
-        return make_result(
-            "traceroute",
-            "Traceroute",
-            "warning",
-            "Traceroute could not be started.",
-            duration,
-            {
-                "Command": shlex.join(command),
-                "Destination address": destination,
-                "Error": str(error),
-            },
-        )
+        raise RuntimeError("Traceroute could not be started.") from error

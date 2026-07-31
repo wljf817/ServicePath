@@ -2,16 +2,10 @@ import hmac
 import os
 from urllib.parse import urlsplit
 
-from flask import Blueprint, abort, current_app, jsonify, request, url_for
+from flask import Blueprint, Response, abort, current_app, jsonify, request
 
-from diagnostics.agent import (
-    AgentConfigurationError,
-    AgentRunError,
-    run_agent_diagnostics,
-)
-from diagnostics.execution import ExecutionError, run_selected_diagnostics
-from diagnostics.remote import RemoteError
-from diagnostics.target import TargetError
+from diagnostics.agent import run_agent_diagnostics
+from diagnostics.execution import run_selected_diagnostics
 from servicepath.database import (
     ReportDataError,
     get_report,
@@ -28,6 +22,7 @@ from servicepath.settings import (
     validate_servicepath_api_token,
     validate_settings,
 )
+from servicepath.streaming import NDJSON_MIMETYPE, stream_operation
 
 
 bp = Blueprint("main", __name__)
@@ -112,16 +107,8 @@ def _settings_authorized(supplied_password):
 
 
 def _environment_value(name, default=""):
-    return os.getenv(name, "").strip() or default
-
-
-def _validated_environment_value(name, default, validator):
-    value = _environment_value(name, default)
-    try:
-        return validator(value)
-    except SettingsError:
-        # Keep invalid values visible so the user can replace them.
-        return value
+    value = os.getenv(name)
+    return default if value is None else value.strip()
 
 
 def _app_settings_payload():
@@ -134,15 +121,11 @@ def _app_settings_payload():
         ),
         "agent_configured": agent_configured,
         "openai_model": _environment_value("OPENAI_MODEL", "gpt-5.6"),
-        "openai_base_url": _validated_environment_value(
-            "OPENAI_BASE_URL",
-            "",
-            validate_openai_base_url,
+        "openai_base_url": validate_openai_base_url(
+            _environment_value("OPENAI_BASE_URL")
         ),
-        "openai_api_mode": _validated_environment_value(
-            "OPENAI_API_MODE",
-            "auto",
-            validate_openai_api_mode,
+        "openai_api_mode": validate_openai_api_mode(
+            _environment_value("OPENAI_API_MODE", "responses")
         ),
     }
 
@@ -160,16 +143,6 @@ def _json_object():
     return None, (jsonify({"error": "The request body must be a JSON object."}), 400)
 
 
-def _diagnostic_error(error):
-    if isinstance(error, (RemoteError, AgentConfigurationError, AgentRunError)):
-        status_code = 503
-    elif isinstance(error, ExecutionError):
-        status_code = 409
-    else:
-        status_code = 400
-    return jsonify({"error": str(error)}), status_code
-
-
 def _valid_bearer_token(expected_token):
     authorization = request.headers.get("Authorization", "")
     scheme, separator, supplied_token = authorization.partition(" ")
@@ -183,6 +156,17 @@ def _valid_bearer_token(expected_token):
         supplied_token == normalized_token
         and normalized_token
         and _constant_time_equal(normalized_token, expected_token)
+    )
+
+
+def _stream_response(operation):
+    return Response(
+        stream_operation(operation),
+        content_type=NDJSON_MIMETYPE,
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
@@ -213,10 +197,7 @@ def api_app_settings():
         return jsonify({"error": "A valid settings password is required."}), 403
 
     try:
-        values = validate_settings(
-            str(data.get("instance_role", "")),
-            str(data.get("remote_service_url", "")),
-        )
+        values = validate_settings(str(data.get("instance_role", "")))
         update_environment_settings(current_app.config["ENV_FILE"], data)
     except SettingsError as error:
         return jsonify({"error": str(error)}), 400
@@ -262,29 +243,25 @@ def diagnose():
     if error_response:
         return error_response
 
-    target = str(data.get("target", data.get("domain", ""))).strip()
-    mode = str(data.get("mode", "local"))
-    if mode not in {"local", "remote", "compare"}:
+    target = str(data.get("domain", "")).strip()
+    mode = str(data.get("mode", "client"))
+    if mode not in {"client", "server"}:
         return jsonify({"error": "Invalid test mode."}), 400
 
-    try:
+    database_path = _database_path()
+    settings = get_settings(database_path)
+
+    def run(emit):
         report = run_selected_diagnostics(
             target,
             mode,
-            get_settings(_database_path()),
+            settings,
+            event_handler=emit,
         )
-    except (
-        AgentConfigurationError,
-        AgentRunError,
-        ExecutionError,
-        TargetError,
-        RemoteError,
-    ) as error:
-        return _diagnostic_error(error)
+        report_id = save_report(database_path, report)
+        return {"report_url": f"/reports/{report_id}"}
 
-    report_id = save_report(_database_path(), report)
-    report_url = url_for("main.view_report", report_id=report_id)
-    return jsonify({"report_url": report_url}), 201
+    return _stream_response(run)
 
 
 @bp.post("/api/diagnose")
@@ -297,11 +274,13 @@ def api_diagnose():
     if error_response:
         return error_response
 
-    try:
-        report = run_agent_diagnostics(data.get("target", ""), mode="remote")
-    except TargetError as error:
-        return jsonify({"error": str(error)}), 400
-    except (AgentConfigurationError, AgentRunError) as error:
-        return jsonify({"error": str(error)}), 503
+    target = data.get("target", "")
 
-    return jsonify(report)
+    def run(emit):
+        return run_agent_diagnostics(
+            target,
+            mode="server",
+            event_handler=emit,
+        )
+
+    return _stream_response(run)

@@ -27,6 +27,7 @@ html { scroll-behavior: smooth; }
 .domain-input, .settings-field input, .settings-select {
     transition: border-color var(--motion-duration-fast) var(--motion-ease-standard), box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
 }
+.settings-select:hover:not(:disabled) { border-color: rgba(110, 168, 254, 0.32); }
 .start-button, .page-action-button, .save-button {
     transition: transform var(--motion-duration-base) var(--motion-ease-standard), box-shadow var(--motion-duration-base) var(--motion-ease-standard), filter var(--motion-duration-base) var(--motion-ease-standard);
 }
@@ -49,7 +50,6 @@ html { scroll-behavior: smooth; }
 .history-arrow {
     transition: color var(--motion-duration-fast) var(--motion-ease-standard), transform var(--motion-duration-base) var(--motion-ease-standard);
 }
-.comparison-row { transition: background var(--motion-duration-fast) var(--motion-ease-standard); }
 .secondary-button:hover:not(:disabled),
 .inline-action:hover:not(:disabled),
 .console-action:hover:not(:disabled) {
@@ -60,7 +60,6 @@ html { scroll-behavior: smooth; }
 .console-action:active:not(:disabled) {
     transform: translateY(0) scale(0.98);
 }
-.settings-select:hover:not(:disabled) { border-color: rgba(110, 168, 254, 0.32); }
 .page-action-button:active:not(:disabled), .save-button:active:not(:disabled) { transform: translateY(0) scale(0.99); }
 .save-button:hover:not(:disabled) {
     filter: brightness(1.08);
@@ -103,16 +102,10 @@ html { scroll-behavior: smooth; }
     --motion-enter-y: -4px;
     animation: motion-enter var(--motion-duration-base) var(--motion-ease-enter) both;
 }
-.layer-block, .history-summary > div {
+.layer-block {
     --motion-enter-y: 8px;
     animation: motion-enter var(--motion-duration-enter) var(--motion-ease-enter) both;
     animation-delay: calc(var(--motion-index, 0) * var(--motion-stagger));
-}
-.history-summary > div:nth-child(2) { --motion-index: 1; }
-.history-summary > div:nth-child(3) { --motion-index: 2; }
-.history-skeleton::after {
-    animation: motion-shimmer var(--motion-duration-runtime) var(--motion-ease-loop) infinite;
-    transform: translateX(-110%);
 }
 
 @keyframes motion-enter {
@@ -139,10 +132,6 @@ html { scroll-behavior: smooth; }
 
 @keyframes motion-cursor {
     50% { opacity: 0; }
-}
-
-@keyframes motion-shimmer {
-    to { transform: translateX(265%); }
 }
 
 @media (prefers-reduced-motion: reduce) {

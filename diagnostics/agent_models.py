@@ -7,7 +7,6 @@ DiagnosticVerdict = Literal[
     "reachable",
     "degraded",
     "unreachable",
-    "inconclusive",
 ]
 DiagnosticStage = Literal[
     "client",

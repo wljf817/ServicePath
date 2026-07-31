@@ -21,31 +21,6 @@ function ReportMetric({label, value}) {
     );
 }
 
-function CompareTable({report}) {
-    return (
-        <Panel className="comparison-panel">
-            <Panel.Header>
-                <div>
-                    <span className="section-kicker">SIDE BY SIDE</span>
-                    <Panel.Title>Evidence comparison</Panel.Title>
-                </div>
-            </Panel.Header>
-            <Panel.Content>
-                <div className="comparison-table">
-                    <div className="comparison-head"><span>Check</span><span>Local</span><span>Remote</span></div>
-                    {report.comparison.layers.map((row) => (
-                        <div className="comparison-row" key={row.key}>
-                            <strong>{row.name}</strong>
-                            <div><StatusBadge status={row.local.status} /><p>{row.local.summary}</p></div>
-                            <div><StatusBadge status={row.remote.status} /><p>{row.remote.summary}</p></div>
-                        </div>
-                    ))}
-                </div>
-            </Panel.Content>
-        </Panel>
-    );
-}
-
 export default function ReportPage({reportId, navigate}) {
     const [report, setReport] = useState(null);
     const [error, setError] = useState("");
@@ -75,9 +50,6 @@ export default function ReportPage({reportId, navigate}) {
                 <Panel.Content>
                     <h1>Report unavailable</h1>
                     <p role="alert">{error}</p>
-                    <button className="secondary-button" onClick={loadReport} type="button">
-                        Try again
-                    </button>
                     <AppLink className="secondary-button" href="/" navigate={navigate}>New diagnosis</AppLink>
                 </Panel.Content>
             </Panel>
@@ -93,16 +65,14 @@ export default function ReportPage({reportId, navigate}) {
         );
     }
 
-    const compare = report.mode === "compare";
-
     return (
         <div className="report-flow">
             <section className={`report-hero report-${report.status}`}>
                 <div className="report-hero-main">
                     <div>
                         <span className="section-kicker">DIAGNOSTIC REPORT · #{report.id}</span>
-                        <h1>{compare ? report.comparison.title : report.analysis?.headline || report.target.hostname}</h1>
-                        <p>{compare ? report.comparison.summary : report.target.url}</p>
+                        <h1>{report.analysis.headline}</h1>
+                        <p>{report.target.url}</p>
                     </div>
                     <div className="report-actions">
                         <StatusBadge status={report.status} />
@@ -114,27 +84,17 @@ export default function ReportPage({reportId, navigate}) {
                 <div className="report-metrics" aria-label="Report summary">
                     <ReportMetric label="Duration" value={`${report.duration_ms} ms`} />
                     <ReportMetric label="Observed break" value={report.first_problem?.toUpperCase() || "None found"} />
-                    <ReportMetric label="Run location" value={compare ? "Local + remote" : report.mode} />
+                    <ReportMetric label="Run location" value={report.mode} />
                     <ReportMetric label="Completed" value={formatDate(report.created_at)} />
                 </div>
             </section>
 
             <AnalysisPanel analysis={report.analysis} />
 
-            {compare ? (
-                <>
-                    <section className="compare-console-grid">
-                        <DiagnosticConsole label="Local Agent Evidence" report={report.local_report} />
-                        <DiagnosticConsole label="Remote Agent Evidence" report={report.remote_report} />
-                    </section>
-                    <CompareTable report={report} />
-                </>
-            ) : (
-                <section className="dashboard-grid report-grid">
-                    <DiagnosticConsole report={report} />
-                    <LayerList report={report} />
-                </section>
-            )}
+            <section className="dashboard-grid report-grid">
+                <DiagnosticConsole report={report} />
+                <LayerList report={report} />
+            </section>
 
         </div>
     );

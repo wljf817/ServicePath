@@ -1,7 +1,7 @@
 import {DIAGNOSTIC_TOOLS, runtimeState} from "../domain/diagnostics";
 
-export default function NetworkPathVisual({loading = false, state}) {
-    const currentState = runtimeState(state, loading);
+export default function NetworkPathVisual({state}) {
+    const currentState = runtimeState(state);
     const running = currentState === "running";
     const visualClass = running
         ? "network-path-visual network-path-visual-running"

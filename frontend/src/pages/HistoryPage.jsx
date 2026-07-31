@@ -31,8 +31,6 @@ export default function HistoryPage({navigate}) {
         loadHistory();
     }, [loadHistory]);
 
-    const issueCount = reports?.filter((report) => report.status !== "passed").length || 0;
-
     return (
         <>
             <section className="page-heading">
@@ -46,14 +44,6 @@ export default function HistoryPage({navigate}) {
                 </AppLink>
             </section>
 
-            {reports && (
-                <section className="history-summary" aria-label="History summary">
-                    <div><span>Total reports</span><strong>{reports.length}</strong></div>
-                    <div><span>Needs attention</span><strong>{issueCount}</strong></div>
-                    <div><span>Latest report</span><strong>{reports[0] ? formatDate(reports[0].created_at) : "No activity"}</strong></div>
-                </section>
-            )}
-
             <Panel className="history-panel">
                 <Panel.Header className="history-header">
                     <div>
@@ -64,22 +54,12 @@ export default function HistoryPage({navigate}) {
                 </Panel.Header>
                 <Panel.Content className="history-content">
                     {!reports && !error && (
-                        <>
-                            <p aria-atomic="true" className="sr-only" role="status">
-                                Loading history...
-                            </p>
-                            <div aria-hidden="true" className="history-skeleton">
-                                {[0, 1, 2, 3].map((item) => <span key={item} />)}
-                            </div>
-                        </>
+                        <p aria-atomic="true" className="empty-copy" role="status">
+                            Loading history...
+                        </p>
                     )}
                     {error && (
-                        <div className="form-error">
-                            <span role="alert">{error}</span>
-                            <button className="inline-action" onClick={loadHistory} type="button">
-                                Try again
-                            </button>
-                        </div>
+                        <p className="form-error" role="alert">{error}</p>
                     )}
                     {reports?.length === 0 && (
                         <div className="empty-state">

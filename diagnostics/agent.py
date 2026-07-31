@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timezone
 from time import perf_counter
+from urllib.parse import urlsplit
 
 from agents import (
     Agent,
@@ -46,12 +47,12 @@ Rules:
 - A "reachable" verdict requires an HTTP response from the HTTP tool. If HTTP
   fails or times out, inspect the relevant lower layers before concluding so
   the report identifies the observed failure boundary when possible.
-- Never describe an unselected check as passed. Report an inconclusive verdict
-  when the collected evidence cannot support a stronger one.
+- Never describe an unselected check as passed. Collect enough evidence for a
+  supported verdict or the run will fail.
 - A missing IPv6 route or the presence of a proxy is environment context, not
   by itself proof that the website is broken.
-- A traceroute timeout or unanswered hop is supporting evidence only; many
-  networks intentionally ignore route probes.
+- An unanswered traceroute hop is supporting evidence only; many networks
+  intentionally ignore route probes.
 - Distinguish observed facts from likely causes. Calibrate confidence.
 - Set failure_stage to the earliest stage where the collected evidence actually
   shows a failure. Use application only when HTTP reached the site but the
@@ -64,14 +65,13 @@ Rules:
 """.strip()
 
 CHAT_COMPLETIONS_OUTPUT_INSTRUCTIONS = """
-After using the tools, return only one valid JSON object with these keys:
-verdict, headline, summary, failure_stage, confidence, evidence,
-likely_causes, and actions. verdict must be reachable, degraded, unreachable,
-or inconclusive. failure_stage must be client, dns, route, tcp, tls, http,
-application, or null. confidence must be low, medium, or high. evidence,
-likely_causes, and actions must be JSON arrays of concise strings.
+Return only one valid JSON object with these keys: verdict, headline, summary,
+failure_stage, confidence, evidence, likely_causes, and actions. verdict must
+be reachable, degraded, or unreachable. failure_stage must be client, dns,
+route, tcp, tls, http, application, or null. confidence must be low, medium, or
+high. evidence, likely_causes, and actions must be JSON arrays of concise
+strings.
 """.strip()
-
 
 class AgentConfigurationError(RuntimeError):
     """Raised when agent diagnostics are not configured."""
@@ -86,7 +86,6 @@ def _report_status(verdict):
         "reachable": "passed",
         "degraded": "warning",
         "unreachable": "error",
-        "inconclusive": "warning",
     }[verdict]
 
 
@@ -99,11 +98,10 @@ def _tool_evidence(context):
     ][:8]
 
 
-def _analysis_payload(diagnosis, model, completion, context):
+def _analysis_payload(diagnosis, model, context):
     return {
         "source": "agent",
         "model": model,
-        "completion": completion,
         "verdict": diagnosis.verdict,
         "headline": diagnosis.headline,
         "text": diagnosis.summary,
@@ -115,19 +113,6 @@ def _analysis_payload(diagnosis, model, completion, context):
     }
 
 
-def _run_usage(run_result):
-    context_wrapper = getattr(run_result, "context_wrapper", None)
-    usage = getattr(context_wrapper, "usage", None)
-    return {
-        "model_calls": getattr(usage, "requests", 0),
-        "token_usage": {
-            "input": getattr(usage, "input_tokens", 0),
-            "output": getattr(usage, "output_tokens", 0),
-            "total": getattr(usage, "total_tokens", 0),
-        },
-    }
-
-
 def _build_report(
     target,
     mode,
@@ -136,8 +121,6 @@ def _build_report(
     diagnosis,
     context,
     duration_ms,
-    run_result,
-    completion="complete",
 ):
     layers = [
         context.results[key]
@@ -158,33 +141,30 @@ def _build_report(
         "first_problem": first_problem,
         "layers": layers,
         "traceroute": traceroute,
-        "analysis": _analysis_payload(diagnosis, model, completion, context),
+        "analysis": _analysis_payload(diagnosis, model, context),
         "agent": {
             "model": model,
             "api_mode": api_mode,
-            "completion": completion,
             "checks_used": context.checks_used,
-            "max_checks": context.max_checks,
-            "requested_tools": context.requested_tools,
             "tool_log": context.tool_log,
-            **_run_usage(run_result),
         },
     }
 
 
-def _resolve_api_mode(base_url):
-    configured_mode = validate_openai_api_mode(
-        os.getenv("OPENAI_API_MODE", "auto")
+def _resolve_api_mode():
+    value = os.getenv("OPENAI_API_MODE")
+    return validate_openai_api_mode(
+        "responses" if value is None else value
     )
-    if configured_mode == "auto":
-        return "chat_completions" if base_url else "responses"
-    return configured_mode
 
 
-def _provider_label(base_url):
-    if not base_url:
-        return "OpenAI"
-    return "The configured model provider"
+def _provider_extra_body(base_url, api_mode):
+    if (
+        api_mode == "chat_completions"
+        and urlsplit(base_url).hostname == "api.deepseek.com"
+    ):
+        return {"thinking": {"type": "disabled"}}
+    return None
 
 
 def _root_provider_error(error):
@@ -201,7 +181,8 @@ def _root_provider_error(error):
 
 
 def _agent_error_message(error, base_url, model, api_mode):
-    provider = _provider_label(base_url)
+    provider = "the configured provider" if base_url else "OpenAI"
+    provider_subject = provider[0].upper() + provider[1:]
     provider_error = _root_provider_error(error)
     protocol = (
         "Chat Completions"
@@ -211,35 +192,36 @@ def _agent_error_message(error, base_url, model, api_mode):
 
     if isinstance(provider_error, (AuthenticationError, PermissionDeniedError)):
         return (
-            f"{provider} rejected the API credentials. Check the API key in "
+            f"{provider_subject} rejected the API credentials. Check the API key in "
             "Settings."
         )
     if isinstance(provider_error, NotFoundError):
         return (
-            f"{provider} could not find model '{model}' or its {protocol} "
-            "endpoint. Check the API Base URL, protocol, and model name."
+            f"{provider_subject} could not find model '{model}' or its {protocol} "
+            "endpoint. Check the Base URL, protocol, and model name."
         )
     if isinstance(provider_error, RateLimitError):
         return (
-            f"{provider} rate-limited the diagnostic Agent. Check account "
-            "quota and retry shortly."
+            f"{provider_subject} rate-limited the diagnostic Agent. Check account "
+            "quota."
         )
     if isinstance(provider_error, APITimeoutError):
-        return f"{provider} timed out before the diagnostic Agent could respond."
-    if isinstance(provider_error, APIConnectionError):
         return (
-            f"ServicePath could not connect to {provider}. Check the API Base "
-            "URL and this server's network access."
+            f"{provider_subject} timed out before the diagnostic Agent could "
+            "respond."
         )
+    if isinstance(provider_error, APIConnectionError):
+        return f"ServicePath could not connect to {provider}. Check network access."
     if isinstance(provider_error, BadRequestError):
+        reason = str(provider_error).strip()[:500]
         return (
-            f"{provider} rejected the Agent request for model '{model}'. "
-            "Verify that the model supports tool calls and JSON output."
+            f"{provider_subject} rejected the Agent request for model '{model}': "
+            f"{reason}"
         )
 
     return (
-        f"{provider} could not complete this investigation using model "
-        f"'{model}' over {protocol}. Check the provider configuration and retry."
+        f"{provider_subject} could not complete this investigation using model "
+        f"'{model}' over {protocol}. Check the provider configuration."
     )
 
 
@@ -247,32 +229,8 @@ def _parse_diagnosis(value):
     if isinstance(value, AgentDiagnosis):
         return value
     if isinstance(value, str):
-        text = value.strip()
-        if text.startswith("```"):
-            lines = text.splitlines()[1:]
-            if lines and lines[-1].strip() == "```":
-                lines.pop()
-            text = "\n".join(lines).strip()
-        return AgentDiagnosis.model_validate_json(text)
+        return AgentDiagnosis.model_validate_json(value.strip())
     return AgentDiagnosis.model_validate(value)
-
-
-def _fallback_diagnosis(context):
-    _, failure_stage = _observed_problem(context)
-
-    return AgentDiagnosis(
-        verdict="inconclusive",
-        headline="Evidence was collected, but the Agent could not finish",
-        summary=(
-            "The available tool results are preserved below, but no complete "
-            "Agent conclusion was produced for this run."
-        ),
-        failure_stage=failure_stage,
-        confidence="low",
-        evidence=_tool_evidence(context),
-        likely_causes=[],
-        actions=["Review the collected evidence and retry the investigation."],
-    )
 
 
 def _http_status_code(context):
@@ -321,13 +279,13 @@ def _diagnosis_is_supported(diagnosis, context):
     if severity == "error":
         return (
             diagnosis.failure_stage == stage
-            and diagnosis.verdict in {"unreachable", "inconclusive"}
+            and diagnosis.verdict == "unreachable"
         )
 
     if severity == "warning":
         return (
             diagnosis.failure_stage == stage
-            and diagnosis.verdict in {"degraded", "inconclusive"}
+            and diagnosis.verdict == "degraded"
         )
 
     http_result = context.results.get("http", {})
@@ -338,13 +296,18 @@ def _diagnosis_is_supported(diagnosis, context):
     if has_success_response:
         return (
             diagnosis.failure_stage is None
-            and diagnosis.verdict in {"reachable", "inconclusive"}
+            and diagnosis.verdict == "reachable"
         )
 
-    return diagnosis.verdict == "inconclusive" and diagnosis.failure_stage is None
+    return False
 
 
-def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
+def run_agent_diagnostics(
+    value,
+    mode="server",
+    max_turns=8,
+    event_handler=None,
+):
     """Let one bounded Agents SDK agent investigate a locked website target."""
     target = normalize_target(value)
 
@@ -356,30 +319,35 @@ def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
 
     try:
         base_url = validate_openai_base_url(os.getenv("OPENAI_BASE_URL", ""))
-        api_mode = _resolve_api_mode(base_url)
+        api_mode = _resolve_api_mode()
     except SettingsError as error:
         raise AgentConfigurationError(str(error)) from error
 
-    model = os.getenv("OPENAI_MODEL", "gpt-5.6").strip() or "gpt-5.6"
+    configured_model = os.getenv("OPENAI_MODEL")
+    model = "gpt-5.6" if configured_model is None else configured_model.strip()
+    if not model:
+        raise AgentConfigurationError("Agent model name cannot be empty.")
 
     use_responses = api_mode == "responses"
     model_provider = OpenAIProvider(
         api_key=api_key,
         base_url=base_url or None,
         use_responses=use_responses,
+        buffer_streamed_tool_calls=not use_responses,
     )
     context = DiagnosticContext(
         target=target,
         mode=mode,
-        max_checks=max_checks,
+        event_handler=event_handler,
     )
     agent = Agent[DiagnosticContext](
         name="ServicePath Investigator",
         instructions=AGENT_INSTRUCTIONS,
         model=model,
         model_settings=ModelSettings(
-            tool_choice="required" if use_responses else "auto",
+            tool_choice="required",
             parallel_tool_calls=False,
+            extra_body=_provider_extra_body(base_url, api_mode),
             extra_args=(
                 None
                 if use_responses
@@ -412,19 +380,6 @@ def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
             ),
         )
     except (AgentsException, OpenAIError) as error:
-        if context.results:
-            duration_ms = round((perf_counter() - started) * 1000)
-            return _build_report(
-                target,
-                mode,
-                model,
-                api_mode,
-                _fallback_diagnosis(context),
-                context,
-                duration_ms,
-                None,
-                completion="fallback",
-            )
         raise AgentRunError(
             _agent_error_message(error, base_url, model, api_mode)
         ) from error
@@ -432,19 +387,6 @@ def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
     try:
         diagnosis = _parse_diagnosis(result.final_output)
     except (TypeError, ValueError) as error:
-        if context.results:
-            duration_ms = round((perf_counter() - started) * 1000)
-            return _build_report(
-                target,
-                mode,
-                model,
-                api_mode,
-                _fallback_diagnosis(context),
-                context,
-                duration_ms,
-                result,
-                completion="fallback",
-            )
         raise AgentRunError(
             "The diagnostic agent returned an invalid final report."
         ) from error
@@ -454,10 +396,10 @@ def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
             "The diagnostic agent finished without collecting network evidence."
         )
 
-    completion = "complete"
     if not _diagnosis_is_supported(diagnosis, context):
-        diagnosis = _fallback_diagnosis(context)
-        completion = "fallback"
+        raise AgentRunError(
+            "The diagnostic agent conclusion is not supported by the evidence."
+        )
 
     duration_ms = round((perf_counter() - started) * 1000)
     return _build_report(
@@ -468,6 +410,4 @@ def run_agent_diagnostics(value, mode="remote", max_checks=6, max_turns=8):
         diagnosis,
         context,
         duration_ms,
-        result,
-        completion=completion,
     )

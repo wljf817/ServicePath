@@ -13,15 +13,13 @@ function currentPath() {
 }
 
 function settingsDraftFrom(appSettings) {
-    const settings = appSettings?.settings || {};
     return {
-        instance_role: settings.instance_role || "remote_server",
+        instance_role: appSettings.settings.instance_role,
         new_settings_password: "",
         openai_api_key: "",
-        openai_api_mode: appSettings?.openai_api_mode || "auto",
-        openai_base_url: appSettings?.openai_base_url || "",
-        openai_model: appSettings?.openai_model || "gpt-5.6",
-        remote_service_url: settings.remote_service_url || "",
+        openai_api_mode: appSettings.openai_api_mode,
+        openai_base_url: appSettings.openai_base_url,
+        openai_model: appSettings.openai_model,
         servicepath_api_token: "",
         settings_password: "",
     };
@@ -39,14 +37,14 @@ export default function App() {
         status: "loading",
     });
     const [settingsSaveState, setSettingsSaveState] = useState({
-        blocking: false,
         error: "",
         status: "idle",
     });
     const [settingsDraft, setSettingsDraft] = useState(null);
     const [diagnosisState, setDiagnosisState] = useState({
         error: "",
-        mode: "remote",
+        events: [],
+        mode: "server",
         reportUrl: "",
         status: "idle",
         target: "",
@@ -159,9 +157,6 @@ export default function App() {
         if (settingsSaveRequestRef.current) {
             return settingsSaveRequestRef.current;
         }
-        if (settingsSaveState.blocking) {
-            return Promise.resolve(null);
-        }
         if (diagnosisRequestRef.current) {
             return Promise.resolve(null);
         }
@@ -169,11 +164,12 @@ export default function App() {
         setDiagnosisState((current) => ({
             ...current,
             error: "",
+            events: [],
             reportUrl: "",
             status: "idle",
         }));
         setSettingsDraft(settings);
-        setSettingsSaveState({blocking: true, error: "", status: "saving"});
+        setSettingsSaveState({error: "", status: "saving"});
         let request;
         request = (async () => {
             try {
@@ -181,22 +177,16 @@ export default function App() {
                     saveAppSettings(settings, {signal})
                 ));
                 if (!result.completed) {
-                    setSettingsSaveState({blocking: false, error: "", status: "idle"});
+                    setSettingsSaveState({error: "", status: "idle"});
                     return null;
                 }
 
                 handleSettingsSaved(result.value);
                 setSettingsDraft(null);
-                setSettingsSaveState({blocking: false, error: "", status: "success"});
+                setSettingsSaveState({error: "", status: "success"});
                 return result.value;
             } catch (error) {
-                const definitelyRejected = (
-                    Number.isInteger(error.status)
-                    && error.status >= 400
-                    && error.status < 500
-                );
                 setSettingsSaveState({
-                    blocking: !definitelyRejected,
                     error: error.message,
                     status: "error",
                 });
@@ -209,12 +199,12 @@ export default function App() {
         })();
         settingsSaveRequestRef.current = request;
         return request;
-    }, [handleSettingsSaved, runSaveSettingsRequest, settingsSaveState.blocking]);
+    }, [handleSettingsSaved, runSaveSettingsRequest]);
 
     const clearSettingsSaveFeedback = useCallback(() => {
         setSettingsSaveState((current) => (
             current.status === "success"
-                ? {blocking: false, error: "", status: "idle"}
+                ? {error: "", status: "idle"}
                 : current
         ));
     }, []);
@@ -226,14 +216,6 @@ export default function App() {
         }));
     }, [settingsState.data]);
 
-    const reconcileSettings = useCallback(async () => {
-        const loaded = await loadAppSettings();
-        if (loaded) {
-            setSettingsDraft(null);
-            setSettingsSaveState({blocking: false, error: "", status: "idle"});
-        }
-    }, [loadAppSettings]);
-
     const runDiagnosis = useCallback((target, mode) => {
         // Keep diagnostics alive and visible when the user changes pages.
         if (diagnosisRequestRef.current) {
@@ -243,9 +225,10 @@ export default function App() {
             return Promise.resolve(null);
         }
 
-        setSettingsSaveState({blocking: false, error: "", status: "idle"});
+        setSettingsSaveState({error: "", status: "idle"});
         setDiagnosisState({
             error: "",
+            events: [],
             mode,
             reportUrl: "",
             status: "running",
@@ -255,7 +238,18 @@ export default function App() {
         request = (async () => {
             try {
                 const result = await runDiagnosisRequest((signal) => (
-                    startDiagnosis(target, mode, {signal})
+                    startDiagnosis(target, mode, {
+                        signal,
+                        onEvent: (event) => {
+                            if (event.type === "run_started") {
+                                return;
+                            }
+                            setDiagnosisState((current) => ({
+                                ...current,
+                                events: [...current.events, event],
+                            }));
+                        },
+                    })
                 ));
                 if (!result.completed) {
                     return null;
@@ -292,7 +286,7 @@ export default function App() {
     const clearDiagnosisFeedback = useCallback(() => {
         setDiagnosisState((current) => (
             current.status === "error"
-                ? {...current, error: "", status: "idle"}
+                ? {...current, error: "", events: [], status: "idle"}
                 : current
         ));
     }, []);
@@ -321,10 +315,7 @@ export default function App() {
                 draft={settingsDraft}
                 onChange={clearSettingsSaveFeedback}
                 onDraftChange={updateSettingsDraft}
-                onReconcile={reconcileSettings}
-                onRetry={loadAppSettings}
                 onSave={saveSettings}
-                saveBlocking={settingsSaveState.blocking}
                 saveError={settingsSaveState.error}
                 saveStatus={settingsSaveState.status}
                 status={settingsState.status}
@@ -336,12 +327,9 @@ export default function App() {
                 appSettings={settingsState.data}
                 diagnosis={diagnosisState}
                 onChange={clearDiagnosisFeedback}
-                onReconcileSettings={reconcileSettings}
                 onStartDiagnosis={runDiagnosis}
-                onRetrySettings={loadAppSettings}
                 settingsError={settingsState.error}
                 settingsSaveError={settingsSaveState.error}
-                settingsSaveBlocking={settingsSaveState.blocking}
                 settingsSaveStatus={settingsSaveState.status}
                 settingsStatus={settingsState.status}
             />

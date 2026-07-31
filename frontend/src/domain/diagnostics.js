@@ -16,28 +16,11 @@ const STATUS_LABELS = {
 
 const RUNTIME_STATES = new Set(["idle", "running", "error"]);
 
-export function safeText(value, fallback = "") {
-    if (typeof value === "string") {
-        return value.trim() ? value : fallback;
+export function runtimeState(value) {
+    if (!RUNTIME_STATES.has(value)) {
+        throw new TypeError(`Invalid runtime state: ${value}`);
     }
-    if (typeof value === "number" || typeof value === "boolean") {
-        return String(value);
-    }
-    return fallback;
-}
-
-export function safeTextList(value) {
-    if (!Array.isArray(value)) {
-        return [];
-    }
-    return value.map((item) => safeText(item)).filter(Boolean);
-}
-
-export function runtimeState(value, loading = false) {
-    if (RUNTIME_STATES.has(value)) {
-        return value;
-    }
-    return loading ? "running" : "idle";
+    return value;
 }
 
 function displayValue(value) {
@@ -71,7 +54,7 @@ export function detailLines(value, prefix = "") {
 export function formatDate(value) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
-        return "Unknown time";
+        throw new TypeError("Invalid report date.");
     }
     return new Intl.DateTimeFormat(undefined, {
         dateStyle: "medium",
@@ -80,15 +63,19 @@ export function formatDate(value) {
 }
 
 export function reportLayers(report) {
-    const layers = Array.isArray(report?.layers) ? report.layers : [];
-    if (!report?.traceroute || layers.some((layer) => layer.key === "traceroute")) {
+    if (!report || !Array.isArray(report.layers)) {
+        throw new TypeError("Invalid report layers.");
+    }
+
+    const layers = report.layers;
+    if (!report.traceroute || layers.some((layer) => layer.key === "traceroute")) {
         return layers;
     }
 
-    // Older reports store traceroute separately, so insert it after DNS.
+    // The report schema stores route evidence after DNS.
     const dnsIndex = layers.findIndex((layer) => layer.key === "dns");
     if (dnsIndex < 0) {
-        return [...layers, report.traceroute];
+        throw new TypeError("Traceroute requires a DNS layer.");
     }
 
     return [
@@ -98,11 +85,18 @@ export function reportLayers(report) {
     ];
 }
 
-export function statusLabel(status = "") {
-    return STATUS_LABELS[status] || status.toUpperCase();
+export function statusLabel(status) {
+    const label = STATUS_LABELS[status];
+    if (!label) {
+        throw new TypeError(`Invalid diagnostic status: ${status}`);
+    }
+    return label;
 }
 
-export function toolNumber(key, fallbackIndex) {
-    return DIAGNOSTIC_TOOLS.find((tool) => tool.key === key)?.number
-        || String(fallbackIndex + 1).padStart(2, "0");
+export function toolNumber(key) {
+    const number = DIAGNOSTIC_TOOLS.find((tool) => tool.key === key)?.number;
+    if (!number) {
+        throw new TypeError(`Invalid diagnostic tool: ${key}`);
+    }
+    return number;
 }

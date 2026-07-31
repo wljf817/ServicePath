@@ -6,14 +6,14 @@ import Spinner from "../components/ui/Spinner";
 
 const roles = [
     {
-        value: "remote_server",
-        title: "Deployed Remote Server",
-        description: "Remote Test runs on this Flask server.",
+        value: "server",
+        title: "Server",
+        description: "Server Test runs on this Flask service.",
     },
     {
-        value: "local_device",
-        title: "Local Device",
-        description: "Local Test runs here; Remote Test calls the configured server.",
+        value: "client",
+        title: "Client",
+        description: "Client Test runs here; Server Test uses the deployed endpoint.",
     },
 ];
 
@@ -41,28 +41,23 @@ export default function SettingsPage({
     error: loadError,
     onChange,
     onDraftChange,
-    onReconcile,
-    onRetry,
     onSave,
-    saveBlocking,
     saveError,
     saveStatus,
     status,
 }) {
     const settings = appSettings?.settings;
     const initialDraft = draft || {
-        instance_role: settings?.instance_role || "remote_server",
+        instance_role: settings?.instance_role ?? "server",
         new_settings_password: "",
         openai_api_key: "",
-        openai_api_mode: appSettings?.openai_api_mode || "auto",
-        openai_base_url: appSettings?.openai_base_url || "",
-        openai_model: appSettings?.openai_model || "gpt-5.6",
-        remote_service_url: settings?.remote_service_url || "",
+        openai_api_mode: appSettings?.openai_api_mode ?? "responses",
+        openai_base_url: appSettings?.openai_base_url ?? "",
+        openai_model: appSettings?.openai_model ?? "gpt-5.6",
         servicepath_api_token: "",
         settings_password: "",
     };
     const [role, setRole] = useState(initialDraft.instance_role);
-    const [remoteUrl, setRemoteUrl] = useState(initialDraft.remote_service_url);
     const [password, setPassword] = useState(initialDraft.settings_password);
     const [apiToken, setApiToken] = useState(initialDraft.servicepath_api_token);
     const [openaiKey, setOpenaiKey] = useState(initialDraft.openai_api_key);
@@ -71,18 +66,17 @@ export default function SettingsPage({
     const [openaiModel, setOpenaiModel] = useState(initialDraft.openai_model);
     const [newSettingsPassword, setNewSettingsPassword] = useState(initialDraft.new_settings_password);
     const saving = saveStatus === "saving";
-    const locked = saving || diagnosisRunning || saveBlocking;
+    const locked = saving || diagnosisRunning;
     const saveState = saving ? "running" : (saveStatus === "error" ? "error" : "idle");
 
     useEffect(() => {
         if (settings && !draft) {
             setRole(settings.instance_role);
-            setRemoteUrl(settings.remote_service_url);
             setPassword("");
             setApiToken("");
             setOpenaiKey("");
-            setOpenaiBaseUrl(appSettings.openai_base_url || "");
-            setOpenaiApiMode(appSettings.openai_api_mode || "auto");
+            setOpenaiBaseUrl(appSettings.openai_base_url);
+            setOpenaiApiMode(appSettings.openai_api_mode);
             setOpenaiModel(appSettings.openai_model);
             setNewSettingsPassword("");
         }
@@ -103,7 +97,6 @@ export default function SettingsPage({
             // App owns the request so navigation does not discard saved settings.
             await onSave({
                 instance_role: role,
-                remote_service_url: remoteUrl,
                 settings_password: password,
                 servicepath_api_token: apiToken,
                 openai_api_key: openaiKey,
@@ -132,7 +125,6 @@ export default function SettingsPage({
                 <Panel.Content>
                     <h1>Settings unavailable</h1>
                     <p role="alert">{loadError || "Application settings could not be loaded."}</p>
-                    <button className="secondary-button" onClick={onRetry} type="button">Try again</button>
                 </Panel.Content>
             </Panel>
         );
@@ -190,29 +182,6 @@ export default function SettingsPage({
                             </div>
                         </fieldset>
 
-                        <div className="settings-subheading">
-                            <span className="settings-subheading-icon">01</span>
-                            <div><strong>Remote connection</strong><small>Where remote requests should be sent.</small></div>
-                        </div>
-
-                        <label className="settings-field">
-                            <span>Deployed ServicePath URL</span>
-                            <div>
-                                <GlobeIcon size={17} />
-                                <input
-                                    disabled={locked}
-                                    onChange={(event) => updateDraft(
-                                        setRemoteUrl,
-                                        "remote_service_url",
-                                        event.target.value,
-                                    )}
-                                    placeholder="https://servicepath.example"
-                                    type="url"
-                                    value={remoteUrl}
-                                />
-                            </div>
-                            <small>Required by a Local Device for Remote Test and Compare Both.</small>
-                        </label>
                     </Panel.Content>
                 </Panel>
 
@@ -225,8 +194,8 @@ export default function SettingsPage({
                     </Panel.Header>
                     <Panel.Content>
                         <ConfigurationStatus
-                            description="Protects the remote diagnostic endpoint."
-                            label="Remote API token"
+                            description="Protects the server diagnostic endpoint."
+                            label="Server API token"
                             ready={appSettings.api_token_configured}
                         />
                         <ConfigurationStatus
@@ -241,11 +210,11 @@ export default function SettingsPage({
                         />
                         <div className="settings-secret-group">
                             <div className="settings-subheading">
-                                <span className="settings-subheading-icon">02</span>
-                                <div><strong>Remote service</strong><small>Authenticate calls between ServicePath instances.</small></div>
+                                <span className="settings-subheading-icon">01</span>
+                                <div><strong>Server connection</strong><small>Authenticate calls between client and server.</small></div>
                             </div>
                             <label className="settings-field">
-                                <span>Remote API token</span>
+                                <span>Server API token</span>
                                 <input
                                     autoComplete="off"
                                     disabled={locked}
@@ -281,7 +250,7 @@ export default function SettingsPage({
                                 />
                             </label>
                             <label className="settings-field">
-                                <span>OpenAI-compatible API base URL</span>
+                                <span>OpenAI-compatible API Base URL</span>
                                 <div>
                                     <GlobeIcon size={17} />
                                     <input
@@ -291,15 +260,15 @@ export default function SettingsPage({
                                             "openai_base_url",
                                             event.target.value,
                                         )}
-                                        placeholder="https://api.openai.com/v1"
+                                        placeholder="https://api.deepseek.com"
                                         type="url"
                                         value={openaiBaseUrl}
                                     />
                                 </div>
-                                <small>Optional. Leave blank for the OpenAI default endpoint.</small>
+                                <small>Leave blank for OpenAI.</small>
                             </label>
                             <label className="settings-field">
-                                <span>Agent API protocol</span>
+                                <span>API protocol</span>
                                 <select
                                     className="settings-select"
                                     disabled={locked}
@@ -310,11 +279,10 @@ export default function SettingsPage({
                                     )}
                                     value={openaiApiMode}
                                 >
-                                    <option value="auto">Auto (recommended)</option>
                                     <option value="responses">Responses API</option>
                                     <option value="chat_completions">Chat Completions</option>
                                 </select>
-                                <small>Auto uses Responses for OpenAI and Chat Completions for custom URLs such as DeepSeek.</small>
+                                <small>Use Chat Completions for DeepSeek and similar providers.</small>
                             </label>
                             <label className="settings-field">
                                 <span>Model name</span>
@@ -333,7 +301,7 @@ export default function SettingsPage({
                         </div>
                         <div className="settings-secret-group">
                             <div className="settings-subheading">
-                                <span className="settings-subheading-icon">03</span>
+                                <span className="settings-subheading-icon">02</span>
                                 <div><strong>Settings access</strong><small>Protect configuration changes on this server.</small></div>
                             </div>
                             <label className="settings-field">
@@ -371,7 +339,7 @@ export default function SettingsPage({
                         <p className="security-copy">
                             New secrets are written to the server <code>.env</code> file.
                             Existing secret values are never returned to this page or saved in SQLite.
-                            The non-secret API base URL is shown so it can be edited or cleared.
+                            The Base URL is not secret and can be edited or cleared.
                         </p>
                     </Panel.Content>
                 </Panel>
@@ -392,15 +360,6 @@ export default function SettingsPage({
                         >
                             {saveStatus === "error" ? saveError : ""}
                         </p>
-                        {saveStatus === "error" && saveBlocking && (
-                            <button
-                                className="inline-action"
-                                onClick={onReconcile}
-                                type="button"
-                            >
-                                Reload saved configuration
-                            </button>
-                        )}
                         {diagnosisRunning ? (
                             <p>Wait for the current investigation before changing settings.</p>
                         ) : saveStatus !== "success" && saveStatus !== "error" && (
