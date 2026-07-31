@@ -1,3 +1,6 @@
+import {appPath} from "./paths";
+
+
 function getErrorMessage(data, response) {
     const serverMessage = [data?.error, data?.message]
         .find((value) => typeof value === "string" && value.trim());
@@ -121,7 +124,7 @@ async function streamRequest(url, options, onEvent) {
 }
 
 export function getAppSettings({signal} = {}) {
-    return request("/api/app-settings", {signal});
+    return request(appPath("/api/app-settings"), {signal});
 }
 
 export function startDiagnosis(domain, settings, {onEvent, signal} = {}) {
@@ -129,7 +132,7 @@ export function startDiagnosis(domain, settings, {onEvent, signal} = {}) {
         throw new TypeError("A diagnostic event handler is required.");
     }
     const presetServer = settings.location.startsWith("preset:");
-    return streamRequest("/diagnose", {
+    return streamRequest(appPath("/diagnose"), {
         method: "POST",
         signal,
         headers: {"Content-Type": "application/json"},

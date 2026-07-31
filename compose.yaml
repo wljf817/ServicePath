@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     environment:
       SERVICEPATH_CONFIG: /config/servicepath.json
+      SERVICEPATH_BASE_PATH: "${SERVICEPATH_BASE_PATH:-}"
     ports:
       - "${SERVICEPATH_BIND_ADDRESS:-127.0.0.1}:${SERVICEPATH_PORT:-5050}:5050"
     volumes:

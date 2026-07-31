@@ -9,6 +9,22 @@ class SettingsError(ValueError):
 
 HOST_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", re.ASCII)
 TOKEN68 = re.compile(r"[A-Za-z0-9\-._~+/]+=*\Z", re.ASCII)
+BASE_PATH = re.compile(r"(?:/[A-Za-z0-9._~-]+)+\Z", re.ASCII)
+
+
+def validate_base_path(value):
+    value = str(value).strip()
+    if not value or value == "/":
+        return ""
+    value = "/" + value.strip("/")
+    segments = value.split("/")[1:]
+    if (
+        len(value) > 512
+        or any(segment in {".", ".."} for segment in segments)
+        or not BASE_PATH.fullmatch(value)
+    ):
+        raise SettingsError("ServicePath base path is invalid.")
+    return value
 
 
 def _normalize_url_host(hostname, label):

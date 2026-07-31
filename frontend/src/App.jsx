@@ -8,6 +8,7 @@ import HistoryPage from "./pages/HistoryPage";
 import ReportPage from "./pages/ReportPage";
 import SettingsPage from "./pages/SettingsPage";
 import {mergeSettings} from "./domain/settings";
+import {appPath, currentAppPath} from "./paths";
 import {
     getBrowserSettings,
     saveBrowserSettings,
@@ -15,7 +16,7 @@ import {
 } from "./storage";
 
 function currentPath() {
-    return window.location.pathname;
+    return currentAppPath();
 }
 
 export default function App() {
@@ -94,7 +95,7 @@ export default function App() {
     }, [navigationCount, path]);
 
     const navigate = useCallback((nextPath) => {
-        window.history.pushState({}, "", nextPath);
+        window.history.pushState({}, "", appPath(nextPath));
         setPath(nextPath);
         setNavigationCount((count) => count + 1);
         window.scrollTo({

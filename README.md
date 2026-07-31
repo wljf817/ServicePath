@@ -46,6 +46,15 @@ npm ci
 npm run build
 ```
 
+To serve the entire application from a URL prefix, set one normalized path:
+
+```bash
+SERVICEPATH_BASE_PATH=/servicepath python app.py
+```
+
+Then open `http://127.0.0.1:5050/servicepath/`. The reverse proxy must forward
+the prefix without stripping it.
+
 ## Server presets
 
 The server can provide private model and remote-server presets from
@@ -102,7 +111,8 @@ calling instance, add its URL and token to the `servers` list, or save them in
 the browser under Settings for a one-browser custom server. Remote Agent tool
 events are streamed live. The remote instance resolves its own model preset
 IDs; matching IDs must therefore exist there, or the user can select a custom
-provider.
+provider. Include its configured base path in the server URL when it uses one,
+for example `https://example.com/servicepath`.
 
 ## Docker
 
@@ -126,6 +136,7 @@ Set its host path in `.env`:
 SERVICEPATH_CONFIG_FILE=./servicepath.config.json
 SERVICEPATH_BIND_ADDRESS=127.0.0.1
 SERVICEPATH_PORT=5050
+SERVICEPATH_BASE_PATH=/servicepath
 ```
 
 Then deploy:

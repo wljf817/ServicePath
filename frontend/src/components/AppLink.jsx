@@ -1,3 +1,6 @@
+import {appPath} from "../paths";
+
+
 function shouldUseClientNavigation(event) {
     const link = event.currentTarget;
 
@@ -27,7 +30,7 @@ export default function AppLink({children, href, navigate, onClick, ...props}) {
     }
 
     return (
-        <a href={href} onClick={handleClick} {...props}>
+        <a href={appPath(href)} onClick={handleClick} {...props}>
             {children}
         </a>
     );

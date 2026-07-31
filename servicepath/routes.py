@@ -1,4 +1,5 @@
 import hmac
+from pathlib import Path
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
@@ -60,7 +61,17 @@ def _server_authorized():
 @bp.get("/settings")
 @bp.get("/reports/<int:report_id>")
 def frontend_app(report_id=None):
-    return current_app.send_static_file("frontend/index.html")
+    index_path = Path(current_app.static_folder) / "frontend" / "index.html"
+    html = index_path.read_text(encoding="utf-8")
+    base_path = current_app.config["BASE_PATH"]
+    html = html.replace(
+        'content="" data-servicepath-base',
+        f'content="{base_path}" data-servicepath-base',
+    ).replace(
+        "/static/frontend/",
+        f"{base_path}/static/frontend/",
+    )
+    return Response(html, content_type="text/html; charset=utf-8")
 
 
 @bp.get("/api/app-settings")
