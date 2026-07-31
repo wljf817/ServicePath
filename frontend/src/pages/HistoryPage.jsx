@@ -1,35 +1,23 @@
-import {useCallback, useEffect, useState} from "react";
+import {useEffect, useState} from "react";
 
-import {getHistory} from "../api";
+import {getHistory} from "../storage";
 import AppLink from "../components/AppLink";
 import {ArrowIcon, HistoryIcon} from "../components/Icons";
 import StatusBadge from "../components/StatusBadge";
 import Panel from "../components/ui/Panel";
 import {formatDate} from "../domain/diagnostics";
-import useAbortableTask from "../hooks/useAbortableTask";
 
 export default function HistoryPage({navigate}) {
     const [reports, setReports] = useState(null);
     const [error, setError] = useState("");
-    const {run: runHistoryRequest} = useAbortableTask();
-
-    const loadHistory = useCallback(async () => {
-        setReports(null);
-        setError("");
-
-        try {
-            const result = await runHistoryRequest((signal) => getHistory({signal}));
-            if (result.completed) {
-                setReports(result.value.reports);
-            }
-        } catch (requestError) {
-            setError(requestError.message);
-        }
-    }, [runHistoryRequest]);
-
     useEffect(() => {
-        loadHistory();
-    }, [loadHistory]);
+        let active = true;
+        getHistory().then(
+            (history) => active && setReports(history),
+            (requestError) => active && setError(requestError.message),
+        );
+        return () => { active = false; };
+    }, []);
 
     return (
         <>
@@ -37,7 +25,7 @@ export default function HistoryPage({navigate}) {
                 <div>
                     <span className="hero-pill"><HistoryIcon size={15} /> Saved reports</span>
                     <h1>Diagnostic history</h1>
-                    <p>Every investigation keeps its agent conclusion and supporting tool evidence.</p>
+                    <p>Reports are private to this browser and never stored on the server.</p>
                 </div>
                 <AppLink className="page-action-button" href="/" navigate={navigate}>
                     New diagnosis <ArrowIcon size={16} />
@@ -70,7 +58,7 @@ export default function HistoryPage({navigate}) {
                     )}
                     {reports?.length > 0 && (
                         <div className="history-table-head" aria-hidden="true">
-                            <span>Report</span><span>Target</span><span>Mode</span><span>Result</span><span />
+                            <span>Report</span><span>Target</span><span>Result</span><span />
                         </div>
                     )}
                     {reports?.map((report) => (
@@ -82,13 +70,12 @@ export default function HistoryPage({navigate}) {
                         >
                             <div className="report-number">#{report.id}</div>
                             <div className="history-target">
-                                <strong>{report.target}</strong>
+                                <strong>{report.target.url}</strong>
                                 <span>
                                     {formatDate(report.created_at)}
                                     {report.first_problem && ` · First issue: ${report.first_problem.toUpperCase()}`}
                                 </span>
                             </div>
-                            <span className="mode-label">{report.mode}</span>
                             <StatusBadge status={report.status} />
                             <ArrowIcon className="history-arrow" size={17} />
                         </AppLink>

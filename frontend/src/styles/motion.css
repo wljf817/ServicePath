@@ -24,15 +24,12 @@ html { scroll-behavior: smooth; }
 .network-path-stage {
     transition: color var(--motion-duration-base) var(--motion-ease-standard), transform var(--motion-duration-base) var(--motion-ease-standard);
 }
-.domain-input, .settings-field input, .settings-select {
+.domain-input, .location-select, .settings-field input, .settings-select {
     transition: border-color var(--motion-duration-fast) var(--motion-ease-standard), box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
 }
 .settings-select:hover:not(:disabled) { border-color: rgba(110, 168, 254, 0.32); }
 .start-button, .page-action-button, .save-button {
     transition: transform var(--motion-duration-base) var(--motion-ease-standard), box-shadow var(--motion-duration-base) var(--motion-ease-standard), filter var(--motion-duration-base) var(--motion-ease-standard);
-}
-.mode-option, .role-option {
-    transition: border-color var(--motion-duration-base) var(--motion-ease-standard), background var(--motion-duration-base) var(--motion-ease-standard), transform var(--motion-duration-base) var(--motion-ease-standard), box-shadow var(--motion-duration-base) var(--motion-ease-standard);
 }
 .secondary-button, .inline-action, .console-action {
     transition: border-color var(--motion-duration-fast) var(--motion-ease-standard), background var(--motion-duration-fast) var(--motion-ease-standard), color var(--motion-duration-fast) var(--motion-ease-standard), transform var(--motion-duration-fast) var(--motion-ease-standard);
@@ -146,7 +143,6 @@ html { scroll-behavior: smooth; }
     #root .network-path-stage:hover,
     #root .start-button:hover:not([disabled]),
     #root .start-button:active:not([disabled]),
-    #root .mode-option:hover:not(:has(input:disabled)),
     #root .secondary-button:hover:not(:disabled),
     #root .secondary-button:active:not(:disabled),
     #root .inline-action:hover:not(:disabled),
@@ -157,7 +153,6 @@ html { scroll-behavior: smooth; }
     #root .page-action-button:active:not(:disabled),
     #root .history-row:hover,
     #root .history-row:hover .history-arrow,
-    #root .role-option:hover:not(:has(input:disabled)),
     #root .save-button:hover:not(:disabled),
     #root .save-button:active:not(:disabled) {
         transform: none;

@@ -231,7 +231,6 @@ export default function DiagnosticConsole({
                 {report && (
                     <>
                         <p><span className="term-info">[INFO]</span> Target: {report.target.url}</p>
-                        <p><span className="term-info">[INFO]</span> Mode: {report.mode}</p>
                         {report.agent && (
                             <>
                                 <p><span className="term-return">[AGENT]</span> Model: {report.agent.model}</p>

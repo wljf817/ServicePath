@@ -4,374 +4,231 @@ import {GlobeIcon, SettingsIcon} from "../components/Icons";
 import Panel from "../components/ui/Panel";
 import Spinner from "../components/ui/Spinner";
 
-const roles = [
-    {
-        value: "server",
-        title: "Server",
-        description: "Server Test runs on this Flask service.",
-    },
-    {
-        value: "client",
-        title: "Client",
-        description: "Client Test runs here; Server Test uses the deployed endpoint.",
-    },
-];
 
-function ConfigurationStatus({ready, label, description}) {
+function StatusBadge({ready}) {
     return (
-        <div className="config-row">
-            <span
-                aria-hidden="true"
-                className={ready ? "config-icon config-ready" : "config-icon"}
-            >
-                <i />
-            </span>
-            <div><strong>{label}</strong><p>{description}</p></div>
-            <span className={ready ? "config-state ready" : "config-state"}>
-                {ready ? "Configured" : "Not configured"}
-            </span>
-        </div>
+        <span className={ready ? "settings-status ready" : "settings-status"}>
+            <i aria-hidden="true" />
+            {ready ? "Configured" : "Not configured"}
+        </span>
     );
 }
+
 
 export default function SettingsPage({
     appSettings,
     diagnosisRunning,
-    draft,
     error: loadError,
     onChange,
-    onDraftChange,
     onSave,
     saveError,
     saveStatus,
     status,
 }) {
-    const settings = appSettings?.settings;
-    const initialDraft = draft || {
-        instance_role: settings?.instance_role ?? "server",
-        new_settings_password: "",
-        openai_api_key: "",
-        openai_api_mode: appSettings?.openai_api_mode ?? "responses",
-        openai_base_url: appSettings?.openai_base_url ?? "",
-        openai_model: appSettings?.openai_model ?? "gpt-5.6",
-        servicepath_api_token: "",
-        settings_password: "",
-    };
-    const [role, setRole] = useState(initialDraft.instance_role);
-    const [password, setPassword] = useState(initialDraft.settings_password);
-    const [apiToken, setApiToken] = useState(initialDraft.servicepath_api_token);
-    const [openaiKey, setOpenaiKey] = useState(initialDraft.openai_api_key);
-    const [openaiBaseUrl, setOpenaiBaseUrl] = useState(initialDraft.openai_base_url);
-    const [openaiApiMode, setOpenaiApiMode] = useState(initialDraft.openai_api_mode);
-    const [openaiModel, setOpenaiModel] = useState(initialDraft.openai_model);
-    const [newSettingsPassword, setNewSettingsPassword] = useState(initialDraft.new_settings_password);
+    const [draft, setDraft] = useState(appSettings);
     const saving = saveStatus === "saving";
     const locked = saving || diagnosisRunning;
-    const saveState = saving ? "running" : (saveStatus === "error" ? "error" : "idle");
 
     useEffect(() => {
-        if (settings && !draft) {
-            setRole(settings.instance_role);
-            setPassword("");
-            setApiToken("");
-            setOpenaiKey("");
-            setOpenaiBaseUrl(appSettings.openai_base_url);
-            setOpenaiApiMode(appSettings.openai_api_mode);
-            setOpenaiModel(appSettings.openai_model);
-            setNewSettingsPassword("");
+        if (appSettings) {
+            setDraft(appSettings);
         }
-    }, [appSettings, draft, settings]);
+    }, [appSettings]);
 
-    function updateDraft(setter, field, value) {
-        setter(value);
-        onDraftChange(field, value);
+    function update(field, value) {
+        setDraft((current) => ({...current, [field]: value}));
+        onChange();
     }
 
     async function submit(event) {
         event.preventDefault();
-        if (locked) {
-            return;
-        }
-
-        try {
-            // App owns the request so navigation does not discard saved settings.
-            await onSave({
-                instance_role: role,
-                settings_password: password,
-                servicepath_api_token: apiToken,
-                openai_api_key: openaiKey,
-                openai_base_url: openaiBaseUrl,
-                openai_api_mode: openaiApiMode,
-                openai_model: openaiModel,
-                new_settings_password: newSettingsPassword,
-            });
-        } catch {
-            // App keeps the error visible across navigation.
+        if (!locked) {
+            try {
+                await onSave(draft);
+            } catch {
+                // App keeps the storage error visible.
+            }
         }
     }
 
     if (status === "loading") {
+        return <div className="page-loading" role="status"><Spinner size="lg" /><p>Loading settings...</p></div>;
+    }
+    if (status === "error" || !draft) {
         return (
-            <div aria-atomic="true" className="page-loading" role="status">
-                <Spinner size="lg" />
-                <p>Loading settings...</p>
-            </div>
+            <Panel className="state-card"><Panel.Content>
+                <h1>Settings unavailable</h1>
+                <p role="alert">{loadError || "Browser settings could not be loaded."}</p>
+            </Panel.Content></Panel>
         );
     }
 
-    if (status === "error" || !appSettings) {
-        return (
-            <Panel className="state-card">
-                <Panel.Content>
-                    <h1>Settings unavailable</h1>
-                    <p role="alert">{loadError || "Application settings could not be loaded."}</p>
-                </Panel.Content>
-            </Panel>
-        );
-    }
+    const providerReady = draft.provider_type === "preset"
+        ? draft.presets.some((preset) => preset.id === draft.preset_id)
+        : Boolean(draft.openai_api_key && draft.openai_model);
+    const serverReady = Boolean(
+        draft.server_presets.length
+        || (draft.custom_server_url && draft.custom_server_token)
+    );
+    const providerValue = draft.provider_type === "preset"
+        ? `preset:${draft.preset_id}`
+        : "custom";
 
     return (
         <>
-            <section className="page-heading">
-                <div>
-                    <span className="hero-pill"><SettingsIcon size={15} /> Application settings</span>
-                    <h1>Configure your workspace</h1>
-                    <p>Choose where tests run and connect the services used by this instance.</p>
-                </div>
-            </section>
+            <section className="page-heading settings-heading"><div>
+                <span className="hero-pill"><SettingsIcon size={15} /> Browser settings</span>
+                <h1>Configure this browser</h1>
+                <p>Personal settings stay in this browser. Preset secrets stay on the server.</p>
+            </div></section>
 
-            <form
-                className="settings-grid"
-                data-state={saveState}
-                onChange={onChange}
-                onSubmit={submit}
-            >
-                <Panel className="settings-panel">
-                    <Panel.Header>
-                        <div>
-                            <span className="section-kicker">EXECUTION</span>
-                            <Panel.Title>Instance role</Panel.Title>
-                            <Panel.Description>Define how this copy of ServicePath should behave.</Panel.Description>
-                        </div>
-                    </Panel.Header>
-                    <Panel.Content>
-                        <fieldset>
-                            <legend className="sr-only">Instance role</legend>
-                            <div className="role-options">
-                                {roles.map((item) => (
-                                    <label
-                                        className={`role-option ${role === item.value ? "role-selected" : ""}`}
-                                        key={item.value}
-                                    >
-                                        <input
-                                            checked={role === item.value}
-                                            disabled={locked}
-                                            name="instance-role"
-                                            onChange={() => updateDraft(
-                                                setRole,
-                                                "instance_role",
-                                                item.value,
-                                            )}
-                                            type="radio"
-                                            value={item.value}
-                                        />
-                                        <span aria-hidden="true" className="role-radio"><i /></span>
-                                        <span><strong>{item.title}</strong><small>{item.description}</small></span>
-                                    </label>
-                                ))}
-                            </div>
-                        </fieldset>
-
-                    </Panel.Content>
-                </Panel>
-
-                <Panel className="configuration-panel">
-                    <Panel.Header>
-                        <div>
-                            <span className="section-kicker">CONFIGURATION</span>
-                            <Panel.Title>Service status</Panel.Title>
-                        </div>
-                    </Panel.Header>
-                    <Panel.Content>
-                        <ConfigurationStatus
-                            description="Protects the server diagnostic endpoint."
-                            label="Server API token"
-                            ready={appSettings.api_token_configured}
-                        />
-                        <ConfigurationStatus
-                            description="Required for autonomous tool selection and diagnosis."
-                            label="Diagnostic agent"
-                            ready={appSettings.agent_configured}
-                        />
-                        <ConfigurationStatus
-                            description="Protects setting changes on a public server."
-                            label="Settings password"
-                            ready={appSettings.password_required}
-                        />
-                        <div className="settings-secret-group">
-                            <div className="settings-subheading">
-                                <span className="settings-subheading-icon">01</span>
-                                <div><strong>Server connection</strong><small>Authenticate calls between client and server.</small></div>
-                            </div>
-                            <label className="settings-field">
-                                <span>Server API token</span>
-                                <input
-                                    autoComplete="off"
-                                    disabled={locked}
-                                    onChange={(event) => updateDraft(
-                                        setApiToken,
-                                        "servicepath_api_token",
-                                        event.target.value,
-                                    )}
-                                    placeholder="Leave blank to keep the current token"
-                                    type="password"
-                                    value={apiToken}
-                                />
-                            </label>
-                        </div>
-                        <div className="settings-secret-group">
-                            <div className="settings-subheading">
+            <form className="settings-grid" onChange={onChange} onSubmit={submit}>
+                <div className="settings-columns">
+                    <Panel className="configuration-panel settings-card">
+                        <Panel.Header className="settings-card-header">
+                            <div className="settings-card-title">
                                 <span className="settings-subheading-icon settings-ai-icon">AI</span>
-                                <div><strong>Diagnostic agent</strong><small>Choose tools, evaluate evidence, and return next steps.</small></div>
-                            </div>
-                            <label className="settings-field">
-                                <span>Agent API key</span>
-                                <input
-                                    autoComplete="off"
-                                    disabled={locked}
-                                    onChange={(event) => updateDraft(
-                                        setOpenaiKey,
-                                        "openai_api_key",
-                                        event.target.value,
-                                    )}
-                                    placeholder="Leave blank to keep the current key"
-                                    type="password"
-                                    value={openaiKey}
-                                />
-                            </label>
-                            <label className="settings-field">
-                                <span>OpenAI-compatible API Base URL</span>
                                 <div>
-                                    <GlobeIcon size={17} />
-                                    <input
-                                        disabled={locked}
-                                        onChange={(event) => updateDraft(
-                                            setOpenaiBaseUrl,
-                                            "openai_base_url",
-                                            event.target.value,
-                                        )}
-                                        placeholder="https://api.deepseek.com"
-                                        type="url"
-                                        value={openaiBaseUrl}
-                                    />
+                                    <Panel.Title>Model provider</Panel.Title>
+                                    <Panel.Description>Choose a server preset or your own API.</Panel.Description>
                                 </div>
-                                <small>Leave blank for OpenAI.</small>
-                            </label>
-                            <label className="settings-field">
-                                <span>API protocol</span>
+                            </div>
+                            <StatusBadge ready={providerReady} />
+                        </Panel.Header>
+                        <Panel.Content>
+                            <label className="settings-field" htmlFor="provider-select">
+                                <span>Provider</span>
                                 <select
                                     className="settings-select"
                                     disabled={locked}
-                                    onChange={(event) => updateDraft(
-                                        setOpenaiApiMode,
-                                        "openai_api_mode",
-                                        event.target.value,
-                                    )}
-                                    value={openaiApiMode}
+                                    id="provider-select"
+                                    onChange={(event) => {
+                                        const value = event.target.value;
+                                        update("provider_type", value === "custom" ? "custom" : "preset");
+                                        update("preset_id", value.startsWith("preset:") ? value.slice(7) : "");
+                                    }}
+                                    value={providerValue}
                                 >
-                                    <option value="responses">Responses API</option>
-                                    <option value="chat_completions">Chat Completions</option>
+                                    <option value="custom">Custom OpenAI-compatible API</option>
+                                    {draft.presets.map((preset) => (
+                                        <option key={preset.id} value={`preset:${preset.id}`}>
+                                            {preset.name} · {preset.model}
+                                        </option>
+                                    ))}
                                 </select>
-                                <small>Use Chat Completions for DeepSeek and similar providers.</small>
                             </label>
-                            <label className="settings-field">
-                                <span>Model name</span>
-                                <input
-                                    disabled={locked}
-                                    onChange={(event) => updateDraft(
-                                        setOpenaiModel,
-                                        "openai_model",
-                                        event.target.value,
-                                    )}
-                                    placeholder="gpt-5.6"
-                                    type="text"
-                                    value={openaiModel}
-                                />
-                            </label>
-                        </div>
-                        <div className="settings-secret-group">
-                            <div className="settings-subheading">
-                                <span className="settings-subheading-icon">02</span>
-                                <div><strong>Settings access</strong><small>Protect configuration changes on this server.</small></div>
+
+                            {draft.provider_type === "custom" && (
+                                <>
+                                    <label className="settings-field">
+                                        <span>API key</span>
+                                        <input
+                                            autoComplete="off"
+                                            disabled={locked}
+                                            onChange={(event) => update("openai_api_key", event.target.value)}
+                                            type="password"
+                                            value={draft.openai_api_key}
+                                        />
+                                    </label>
+                                    <label className="settings-field">
+                                        <span>OpenAI-compatible API Base URL</span>
+                                        <div><GlobeIcon size={17} /><input
+                                            disabled={locked}
+                                            onChange={(event) => update("openai_base_url", event.target.value)}
+                                            placeholder="https://api.deepseek.com"
+                                            type="url"
+                                            value={draft.openai_base_url}
+                                        /></div>
+                                        <small>Leave blank for OpenAI.</small>
+                                    </label>
+                                    <label className="settings-field">
+                                        <span>API protocol</span>
+                                        <select
+                                            className="settings-select"
+                                            disabled={locked}
+                                            onChange={(event) => update("openai_api_mode", event.target.value)}
+                                            value={draft.openai_api_mode}
+                                        >
+                                            <option value="responses">Responses API</option>
+                                            <option value="chat_completions">Chat Completions</option>
+                                        </select>
+                                    </label>
+                                    <label className="settings-field">
+                                        <span>Model name</span>
+                                        <input
+                                            disabled={locked}
+                                            onChange={(event) => update("openai_model", event.target.value)}
+                                            value={draft.openai_model}
+                                        />
+                                    </label>
+                                </>
+                            )}
+                        </Panel.Content>
+                    </Panel>
+
+                    <Panel className="configuration-panel settings-card">
+                        <Panel.Header className="settings-card-header">
+                            <div className="settings-card-title">
+                                <span className="settings-subheading-icon">SV</span>
+                                <div>
+                                    <Panel.Title>Remote servers</Panel.Title>
+                                    <Panel.Description>
+                                        {draft.server_presets.length
+                                            ? `${draft.server_presets.length} server preset${draft.server_presets.length === 1 ? "" : "s"} available.`
+                                            : "Add a private Custom Server if needed."}
+                                    </Panel.Description>
+                                </div>
                             </div>
+                            <StatusBadge ready={serverReady} />
+                        </Panel.Header>
+                        <Panel.Content>
+                            {draft.server_presets.length > 0 && (
+                                <div className="settings-preset-list">
+                                    {draft.server_presets.map((server) => (
+                                        <p key={server.id}><strong>{server.name}</strong><span>{server.url}</span></p>
+                                    ))}
+                                </div>
+                            )}
                             <label className="settings-field">
-                                <span>Current settings password</span>
-                                <input
-                                    autoComplete="current-password"
+                                <span>Custom Server URL</span>
+                                <div><GlobeIcon size={17} /><input
                                     disabled={locked}
-                                    onChange={(event) => updateDraft(
-                                        setPassword,
-                                        "settings_password",
-                                        event.target.value,
-                                    )}
-                                    placeholder={appSettings.password_required ? "Required to save changes" : "Not required from localhost"}
-                                    type="password"
-                                    value={password}
-                                />
-                                <small>Authenticates this update when a password already exists.</small>
+                                    onChange={(event) => update("custom_server_url", event.target.value)}
+                                    placeholder="https://servicepath.example.com"
+                                    type="url"
+                                    value={draft.custom_server_url}
+                                /></div>
                             </label>
                             <label className="settings-field">
-                                <span>New settings password</span>
+                                <span>Custom Server token</span>
                                 <input
-                                    autoComplete="new-password"
+                                    autoComplete="off"
                                     disabled={locked}
-                                    onChange={(event) => updateDraft(
-                                        setNewSettingsPassword,
-                                        "new_settings_password",
-                                        event.target.value,
-                                    )}
-                                    placeholder="Leave blank to keep the current password"
+                                    onChange={(event) => update("custom_server_token", event.target.value)}
                                     type="password"
-                                    value={newSettingsPassword}
+                                    value={draft.custom_server_token}
                                 />
                             </label>
-                        </div>
-                        <p className="security-copy">
-                            New secrets are written to the server <code>.env</code> file.
-                            Existing secret values are never returned to this page or saved in SQLite.
-                            The Base URL is not secret and can be edited or cleared.
-                        </p>
-                    </Panel.Content>
-                </Panel>
+                        </Panel.Content>
+                    </Panel>
+                </div>
 
                 <div className="settings-save-bar">
                     <div>
-                        <p
-                            aria-atomic="true"
-                            className={saveStatus === "success" ? "success-message" : "sr-only"}
-                            role="status"
-                        >
-                            {saveStatus === "success" ? "Settings saved successfully." : ""}
+                        <strong className="settings-save-title">Private by default</strong>
+                        <p className="settings-save-description">
+                            Custom values stay in this browser. Preset secrets stay on the server.
                         </p>
-                        <p
-                            aria-atomic="true"
-                            className={saveStatus === "error" ? "form-error" : "sr-only"}
-                            role="alert"
-                        >
+                        <p className={saveStatus === "success" ? "success-message" : "sr-only"} role="status">
+                            {saveStatus === "success" ? "Browser settings saved." : ""}
+                        </p>
+                        <p className={saveStatus === "error" ? "form-error" : "sr-only"} role="alert">
                             {saveStatus === "error" ? saveError : ""}
                         </p>
-                        {diagnosisRunning ? (
-                            <p>Wait for the current investigation before changing settings.</p>
-                        ) : saveStatus !== "success" && saveStatus !== "error" && (
-                            <p>
-                                Changes apply to the next diagnosis in single-process development.
-                                Restart every worker in multi-worker production.
-                            </p>
-                        )}
+                        {diagnosisRunning && <p>Wait for the current investigation before changing settings.</p>}
                     </div>
-                    <button aria-busy={saving} className="save-button" disabled={locked} type="submit">
-                        {saving && <Spinner size="sm" />}
-                        {saving ? "Saving settings" : "Save all settings"}
+                    <button className="save-button" disabled={locked} type="submit">
+                        {saving && <Spinner size="sm" />}{saving ? "Saving" : "Save in this browser"}
                     </button>
                 </div>
             </form>

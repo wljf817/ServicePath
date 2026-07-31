@@ -308,7 +308,6 @@ fieldset { min-width: 0; border: 0; }
 .analysis-panel,
 .state-card,
 .history-panel,
-.settings-panel,
 .configuration-panel {
     border: 1px solid var(--sp-border);
     border-radius: var(--sp-radius-md);
@@ -321,7 +320,6 @@ fieldset { min-width: 0; border: 0; }
 .layers-panel h2,
 .analysis-panel h2,
 .history-panel h2,
-.settings-panel h2,
 .configuration-panel h2 {
     color: #dce5f2;
     font-size: 16px;

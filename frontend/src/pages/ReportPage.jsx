@@ -1,6 +1,6 @@
-import {useCallback, useEffect, useState} from "react";
+import {useEffect, useState} from "react";
 
-import {getReport} from "../api";
+import {getReport} from "../storage";
 import AnalysisPanel from "../components/AnalysisPanel";
 import AppLink from "../components/AppLink";
 import DiagnosticConsole from "../components/DiagnosticConsole";
@@ -10,7 +10,6 @@ import StatusBadge from "../components/StatusBadge";
 import Panel from "../components/ui/Panel";
 import Spinner from "../components/ui/Spinner";
 import {formatDate} from "../domain/diagnostics";
-import useAbortableTask from "../hooks/useAbortableTask";
 
 function ReportMetric({label, value}) {
     return (
@@ -24,25 +23,14 @@ function ReportMetric({label, value}) {
 export default function ReportPage({reportId, navigate}) {
     const [report, setReport] = useState(null);
     const [error, setError] = useState("");
-    const {run: runReportRequest} = useAbortableTask();
-
-    const loadReport = useCallback(async () => {
-        setReport(null);
-        setError("");
-
-        try {
-            const result = await runReportRequest((signal) => getReport(reportId, {signal}));
-            if (result.completed) {
-                setReport(result.value);
-            }
-        } catch (requestError) {
-            setError(requestError.message);
-        }
-    }, [reportId, runReportRequest]);
-
     useEffect(() => {
-        loadReport();
-    }, [loadReport]);
+        let active = true;
+        getReport(reportId).then(
+            (savedReport) => active && setReport(savedReport),
+            (requestError) => active && setError(requestError.message),
+        );
+        return () => { active = false; };
+    }, [reportId]);
 
     if (error) {
         return (
@@ -84,7 +72,6 @@ export default function ReportPage({reportId, navigate}) {
                 <div className="report-metrics" aria-label="Report summary">
                     <ReportMetric label="Duration" value={`${report.duration_ms} ms`} />
                     <ReportMetric label="Observed break" value={report.first_problem?.toUpperCase() || "None found"} />
-                    <ReportMetric label="Run location" value={report.mode} />
                     <ReportMetric label="Completed" value={formatDate(report.created_at)} />
                 </div>
             </section>

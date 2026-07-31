@@ -2,12 +2,7 @@ import {useEffect, useState} from "react";
 
 import {runtimeState} from "../domain/diagnostics";
 
-const modeLabels = {
-    client: "Client",
-    server: "Server",
-};
-
-export default function ScanProgress({mode, state}) {
+export default function ScanProgress({locationLabel, state}) {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const currentState = runtimeState(state);
     const running = currentState === "running";
@@ -37,9 +32,8 @@ export default function ScanProgress({mode, state}) {
         return null;
     }
 
-    const locationLabel = modeLabels[mode];
     if (!locationLabel) {
-        throw new TypeError(`Invalid diagnostic mode: ${mode}`);
+        throw new TypeError("Run location label is required.");
     }
 
     return (
@@ -49,7 +43,9 @@ export default function ScanProgress({mode, state}) {
             </div>
 
             <div className="scan-progress-copy">
-                <span className="scan-progress-location">{locationLabel}</span>
+                <span className="scan-progress-location">
+                    {locationLabel}
+                </span>
                 <p aria-atomic="true" className="scan-progress-announcement" role="status">
                     Investigation in progress
                 </p>

@@ -128,31 +128,32 @@ export function getAppSettings({signal} = {}) {
     return request("/api/app-settings", {signal});
 }
 
-export function getReport(reportId, {signal} = {}) {
-    return request(`/api/reports/${reportId}`, {signal});
-}
-
-export function getHistory({signal} = {}) {
-    return request("/api/history", {signal});
-}
-
-export function saveAppSettings(settings, {signal} = {}) {
-    return request("/api/app-settings", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(settings),
-        signal,
-    });
-}
-
-export function startDiagnosis(domain, mode, {onEvent, signal} = {}) {
+export function startDiagnosis(domain, settings, {onEvent, signal} = {}) {
     if (typeof onEvent !== "function") {
         throw new TypeError("A diagnostic event handler is required.");
     }
+    const presetServer = settings.location.startsWith("preset:");
     return streamRequest("/diagnose", {
         method: "POST",
         signal,
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({domain, mode}),
+        body: JSON.stringify({
+            domain,
+            location: presetServer ? "preset" : settings.location,
+            server_id: presetServer ? settings.location.slice(7) : "",
+            provider: settings.provider_type === "preset"
+                ? {type: "preset", id: settings.preset_id}
+                : {
+                    type: "custom",
+                    api_key: settings.openai_api_key,
+                    api_mode: settings.openai_api_mode,
+                    base_url: settings.openai_base_url,
+                    model: settings.openai_model,
+                },
+            custom_server: {
+                token: settings.custom_server_token,
+                url: settings.custom_server_url,
+            },
+        }),
     }, onEvent);
 }
