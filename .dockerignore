@@ -5,6 +5,7 @@
 !package.json
 !package-lock.json
 !vite.config.js
+!servicepath.config.example.json
 
 !diagnostics/
 !diagnostics/**
