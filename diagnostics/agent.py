@@ -32,6 +32,15 @@ public HTTP(S) target and a set of read-only network diagnostic tools. Decide
 which tools are useful, call them, inspect their returned evidence, and stop as
 soon as you can give a defensible diagnosis.
 
+Workflow:
+1. Start by calling the single most useful tool for the target. Never return a
+   final diagnosis before the first tool result.
+2. After every tool call, inspect its result and all available evidence.
+3. Call another tool only when it can confirm the current explanation, locate
+   an earlier failure boundary, or rule out a competing explanation.
+4. When the evidence is sufficient, stop calling tools and return the final
+   structured diagnosis.
+
 Rules:
 - Use tools for every factual claim about the target. Never invent a result.
 - The target is locked by the server. Do not ask for or propose another target.
@@ -235,6 +244,7 @@ def run_agent_diagnostics(
         instructions=AGENT_INSTRUCTIONS,
         model=model,
         model_settings=ModelSettings(
+            tool_choice="required",
             parallel_tool_calls=False,
             extra_body=_provider_extra_body(base_url, api_mode),
             extra_args=(
@@ -245,10 +255,12 @@ def run_agent_diagnostics(
         ),
         tools=AGENT_TOOLS,
         output_type=AgentDiagnosis if use_responses else None,
+        reset_tool_choice=True,
     )
     prompt = (
         "Investigate the server-locked target from this ServicePath runtime. "
-        "Select and use the available tools, then return the structured diagnosis."
+        "Begin with one tool call, inspect each result, choose any further tools "
+        "that the evidence requires, then return the structured diagnosis."
     )
     if not use_responses:
         prompt = f"{prompt}\n\n{CHAT_COMPLETIONS_OUTPUT_INSTRUCTIONS}"
